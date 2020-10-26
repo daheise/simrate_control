@@ -51,12 +51,6 @@ def check_lat_lons(waypoint_coords):
     """
     pass
 
-FPL_DIR=os.getenv("LOCALAPPDATA") + "/Packages/Microsoft.FlightSimulator_8wekyb3d8bbwe/LocalState/"
-plns = [ f for f in os.listdir(FPL_DIR) if f.endswith('.pln')]
-plan=sorted(plns, key=lambda name:
-                  os.path.getmtime(os.path.join(FPL_DIR, name)))[-1]
-print(os.path.join(FPL_DIR,plan))
-
 logging.basicConfig(level=logging.DEBUG)
 LOGGER = logging.getLogger(__name__)
 LOGGER.info("START")

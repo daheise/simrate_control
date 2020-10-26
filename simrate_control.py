@@ -6,7 +6,52 @@ from time import sleep
 import os
 import pyttsx3
 
-FPL_DIR="C:/Users/David Heise/AppData/Local/Packages/Microsoft.FlightSimulator_8wekyb3d8bbwe/LocalState/"
+def say_sim_rate():
+    """Speak the current sim rate using text-to-speech
+    """
+    simrate = sc_sim_rate.value
+    engine.say(f"Sim rate {str(simrate)}")
+    engine.runAndWait()
+
+def stop_acceleration():
+    """Decrease the sim rate to the minimum
+    """
+    simrate = sc_sim_rate.value
+    if simrate is None:
+        return
+    while simrate > MIN_RATE:
+        simrate = sc_sim_rate.value
+        sleep(2)
+        decelerate()
+
+def decelerate(minimum=1):
+    """Decrease the sim rate, up to some maximum
+    """
+    simrate = sc_sim_rate.value
+    if simrate is None:
+        return
+    if simrate > MIN_RATE:
+        decrease_sim_rate()
+    elif simrate < MIN_RATE:
+        increase_sim_rate()
+
+def accelerate(maximum):
+    """Increase the sim rate, up to some maximum
+    """
+    simrate = sc_sim_rate.value
+    if simrate is None:
+        return
+    if simrate < MAX_RATE:
+        increase_sim_rate()
+    elif simrate > MAX_RATE:
+        decrease_sim_rate()
+
+def check_lat_lons(waypoint_coords):
+    """I don't remember what this was going to be for
+    """
+    pass
+
+FPL_DIR=os.getenv("LOCALAPPDATA") + "/Packages/Microsoft.FlightSimulator_8wekyb3d8bbwe/LocalState/"
 plns = [ f for f in os.listdir(FPL_DIR) if f.endswith('.pln')]
 plan=sorted(plns, key=lambda name:
                   os.path.getmtime(os.path.join(FPL_DIR, name)))[-1]
@@ -33,7 +78,7 @@ cur_long = aq.find("GPS_POSITION_LON")
 next_wp_lat = aq.find("GPS_WP_NEXT_LAT")
 next_wp_lon = aq.find("GPS_WP_NEXT_LON")
 height = aq.find("PLANE_ALT_ABOVE_GROUND")
-cur_sim_rate = aq.find("SIMULATION_RATE")
+sc_sim_rate = aq.find("SIMULATION_RATE")
 increase_sim_rate = ae.find("SIM_RATE_INCR")
 decrease_sim_rate = ae.find("SIM_RATE_DECR")
 cur_waypoint_index = aq.find("GPS_FLIGHT_PLAN_WP_INDEX")
@@ -56,46 +101,16 @@ ground_speed = 0
 print(str(is_prev_wp_valid.value))
 
 engine = pyttsx3.init()
-def say_sim_rate():
-    simrate = cur_sim_rate.value
-    engine.say(f"Sim rate {str(simrate)}")
-    engine.runAndWait()
 
-def stop_acceleration():
-    simrate = cur_sim_rate.value
-    if simrate is None:
-        return
-    while simrate > MIN_RATE:
-        simrate = cur_sim_rate.value
-        sleep(2)
-        decelerate()
 
-def decelerate():
-    simrate = cur_sim_rate.value
-    if simrate is None:
-        return
-    if simrate > MIN_RATE:
-        decrease_sim_rate()
-
-def accelerate():
-    simrate = cur_sim_rate.value
-    if simrate is None:
-        return
-    if simrate < MAX_RATE:
-        increase_sim_rate()
-
-def check_lat_lons(waypoint_coords):
-    pass
-
-#while height.value > 100:
 prev_simrate = None
-new_simrate = cur_sim_rate.value
+new_simrate = sc_sim_rate.value
 say_sim_rate()
 try:
     while True:
         cur_height = height.value
         cur_vsi = sc_vsi.value
-        prev_simrate = cur_sim_rate.value
+        prev_simrate = sc_sim_rate.value
         if is_prev_wp_valid.value:
             try:
                 prev_clearance = distance.distance((prev_wp_lat.value, prev_wp_lon.value),
@@ -124,7 +139,7 @@ try:
                     stop_acceleration()
                 elif(cur_vsi < VSI_MIN or cur_vsi > VSI_MAX):
                     print("Vertical speed too high. Stopping acceleration.")
-                    stop_acceleration()
+                    decelerate()
                 else:
                     print("WARP SPEED!")
                     accelerate()
@@ -134,17 +149,17 @@ try:
                 print("DATA ERROR: DECEL")
                 decelerate()
             finally:
-                new_simrate = cur_sim_rate.value
+                new_simrate = sc_sim_rate.value
                 if prev_simrate != new_simrate:
                     say_sim_rate()
-                    print("SIM RATE: ", cur_sim_rate.value)
+                    print("SIM RATE: ", sc_sim_rate.value)
         else:
             print("No valid waypoints. Travel not possible.")
         sleep(2)
 
 finally:
     stop_acceleration()
-    print(cur_sim_rate.value)
+    print(sc_sim_rate.value)
     say_sim_rate()
     sm.exit()
 

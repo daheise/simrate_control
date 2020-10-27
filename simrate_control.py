@@ -6,44 +6,42 @@ from time import sleep
 import os
 import pyttsx3
 
-def say_sim_rate():
+def say_sim_rate(simrate):
     """Speak the current sim rate using text-to-speech
     """
     simrate = sc_sim_rate.value
     engine.say(f"Sim rate {str(simrate)}")
     engine.runAndWait()
 
-def stop_acceleration():
+def stop_acceleration(simrate):
     """Decrease the sim rate to the minimum
     """
-    simrate = sc_sim_rate.value
     if simrate is None:
         return
     while simrate > MIN_RATE:
-        simrate = sc_sim_rate.value
         sleep(2)
-        decelerate()
+        decelerate(simrate)
+        simrate /= 2
 
-def decelerate(minimum=1):
+
+def decelerate(simrate, minimum=1):
     """Decrease the sim rate, up to some maximum
     """
-    simrate = sc_sim_rate.value
     if simrate is None:
         return
-    if simrate > MIN_RATE:
+    if simrate > minimum:
         decrease_sim_rate()
-    elif simrate < MIN_RATE:
+    elif simrate < minimum:
         increase_sim_rate()
 
-def accelerate(maximum):
+def accelerate(simrate, maximum):
     """Increase the sim rate, up to some maximum
     """
-    simrate = sc_sim_rate.value
     if simrate is None:
         return
-    if simrate < MAX_RATE:
+    if simrate < maximum:
         increase_sim_rate()
-    elif simrate > MAX_RATE:
+    elif simrate > maximum:
         decrease_sim_rate()
 
 def check_lat_lons(waypoint_coords):
@@ -98,8 +96,8 @@ engine = pyttsx3.init()
 
 
 prev_simrate = None
-new_simrate = sc_sim_rate.value
-say_sim_rate()
+new_simrate = None #sc_sim_rate.value
+#say_sim_rate()
 try:
     while True:
         cur_height = height.value
@@ -115,46 +113,47 @@ try:
                 print(prev_clearance, next_clearance)
                 if (not autopilot_active.value):
                     print("Autpilot not enabled. Stopping acceleration.")
-                    stop_acceleration()
+                    stop_acceleration(prev_simrate)
                 elif(cur_waypoint_index.value >= (num_waypoints.value - 1) and next_clearance < 25 and cur_height <= 3000):
                     # Don't really understand the counting here...
                     print("Arrival imminent. Stopping acceleration.")
                     #engine.say(f"On last leg. Prepare for landing.")
                     #engine.runAndWait()
-                    stop_acceleration()
+                    stop_acceleration(prev_simrate)
                 elif(approach_active.value):
                     print("Approach activated. Stopping acceleration.")
-                    stop_acceleration()
+                    stop_acceleration(prev_simrate)
                 elif(prev_clearance < 1 or next_clearance < 1):
                     print("Close to waypoint. Stopping acceleration.")
-                    stop_acceleration()
+                    stop_acceleration(prev_simrate)
                 elif(cur_height < 1000):
                     print("Too close to ground. Stopping acceleration.")
-                    stop_acceleration()
+                    stop_acceleration(prev_simrate)
                 elif(cur_vsi < VSI_MIN or cur_vsi > VSI_MAX):
                     print("Vertical speed too high. Stopping acceleration.")
-                    decelerate()
+                    decelerate(prev_simrate)
                 else:
                     print("WARP SPEED!")
-                    accelerate()
+                    accelerate(prev_simrate, MAX_RATE)
             except KeyboardInterrupt:
                 raise KeyboardInterrupt
             except:
                 print("DATA ERROR: DECEL")
-                decelerate()
+                decelerate(prev_simrate)
             finally:
                 new_simrate = sc_sim_rate.value
                 if prev_simrate != new_simrate:
-                    say_sim_rate()
-                    print("SIM RATE: ", sc_sim_rate.value)
+                    say_sim_rate(new_simrate)
+                    print("SIM RATE: ", new_simrate)
         else:
             print("No valid waypoints. Travel not possible.")
         sleep(2)
 
 finally:
-    stop_acceleration()
+    simrate = sc_sim_rate.value
+    stop_acceleration(simrate)
     print(sc_sim_rate.value)
-    say_sim_rate()
+    say_sim_rate(simrate)
     sm.exit()
 
 quit()

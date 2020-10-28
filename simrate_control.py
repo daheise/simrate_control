@@ -50,6 +50,7 @@ class FlightStability():
         self.aq_agl = self.aq.find("PLANE_ALT_ABOVE_GROUND")
         self.aq_approach_hold = self.aq.find("AUTOPILOT_APPROACH_HOLD")
         self.aq_approach_active = self.aq.find("GPS_IS_APPROACH_ACTIVE")
+        self.aq_ete = self.aq.find("GPS_ETE")
         #self.aq_nav_has_nav = [self.aq.find("NAV_HAS_NAV:1"), self.aq.find("NAV_HAS_NAV:2")]
         self.aq_has_localizer = [self.aq.find("NAV_HAS_LOCALIZER:1"), self.aq.find("NAV_HAS_LOCALIZER:2")]
         self.aq_has_glide_scope = [self.aq.find("NAV_HAS_GLIDE_SLOPE:1"), self.aq.find("NAV_HAS_GLIDE_SLOPE:2")]
@@ -251,6 +252,10 @@ class FlightStability():
                 logging.info(f"Last waypoint and low")
                 approaching = True
 
+            if(self.aq_ete.value < 10*60):
+                logging.info(f"Less than 10 minutes from destination")
+                approaching = True
+
             if(autopilot_active and (approach_active or approach_hold)):
                 logging.info("Approach is active or approach hold mode on")
                 approaching = True
@@ -410,7 +415,7 @@ try:
                 print("SIM RATE: ", prev_simrate, new_simrate)
         
 except Exception as e:
-    print(e)
+    print(type(e).__name__, e)
 finally:
     simrate = srm.get_sim_rate()
     srm.stop_acceleration()

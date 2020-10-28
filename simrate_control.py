@@ -54,6 +54,7 @@ class FlightStability():
         self.aq_has_localizer = [self.aq.find("NAV_HAS_LOCALIZER:1"), self.aq.find("NAV_HAS_LOCALIZER:2")]
         self.aq_has_glide_scope = [self.aq.find("NAV_HAS_GLIDE_SLOPE:1"), self.aq.find("NAV_HAS_GLIDE_SLOPE:2")]
         self.aq_nav_mode = self.aq.find("AUTOPILOT_NAV1_LOCK")
+        self.aq_ground_speed = self.aq.find("GPS_GROUND_SPEED")
 
     def get_waypoint_distances(self):
         """Get the distance to the previous and next FPL waypoints.
@@ -153,24 +154,29 @@ class FlightStability():
         logging.info("No valid waypoints detected.")
         return False
 
-    def is_waypoint_close(self, previous_dist:float=5, next_dist:float=1.0):
+    def is_waypoint_close(self, prev_seconds = 60, next_seconds = 60):
         """Check is a waypoint is close by.
 
-        In the future, the definition of "close" could be parameterized on speed and
-        bearing to/out of the waypoint. Higher speeds and greater degrees of turn
+        In the future, the definition of "close" could be parameterized on
+        bearing to/out of the waypoint. Greater degrees of turn
         need more buffer.
 
-        IMPORTANT: The FMS often switches to a new waypoint up to 2.5nm before arriving at one
-        to cut the corner.
+        IMPORTANT: Buffer size is decided largely by the FMS switching waypoints early
+        to cut corners.
         """
         close = True
         try:
+            ground_speed = self.aq_ground_speed.value # units: meters/sec
+            mps_to_nmps = 5.4e-4 # one meter per second to 1 nautical mile per second
+            nautical_miles_per_second = ground_speed * mps_to_nmps
+            previous_dist = nautical_miles_per_second * prev_seconds
+            next_dist = nautical_miles_per_second * next_seconds
             clearance = self.get_waypoint_distances()
 
             if (clearance.prev > previous_dist and clearance.next > next_dist):
                 close = False
             else:
-                logging.info(f"Close to waypoint: ({clearance.prev} nm, {clearance.next} nm)")
+                logging.info(f"Close ({previous_dist}, {next_dist}) to waypoint: ({clearance.prev} nm, {clearance.next} nm)")
         except TypeError:
             raise SimConnectDataError()
 
@@ -273,7 +279,7 @@ class FlightStability():
                 elif(self.is_approaching()):
                     logging.info("Arrival imminent.")
                     stable = False
-                elif(self.is_waypoint_close(3, 4)):
+                elif(self.is_waypoint_close()):
                     # The AP will switch waypoints several miles away to cut corners,
                     # so we slow down far enough away that we don't enter a turn prior
                     # to slowing down (4nm). To keep from speeding up immediately when
@@ -403,8 +409,8 @@ try:
                 srm.say_sim_rate()
                 print("SIM RATE: ", prev_simrate, new_simrate)
         
-except:
-    pass
+except Exception as e:
+    print(e)
 finally:
     simrate = srm.get_sim_rate()
     srm.stop_acceleration()

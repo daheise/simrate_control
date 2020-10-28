@@ -1,3 +1,4 @@
 geopy
 SimConnect
 pyttsx3
+pyinstaller

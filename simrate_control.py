@@ -167,7 +167,7 @@ class FlightStability:
         logging.info("No valid waypoints detected.")
         return False
 
-    def is_waypoint_close(self, prev_seconds=30, next_seconds=30):
+    def is_waypoint_close(self, prev_seconds=40, next_seconds=40):
         """Check is a waypoint is close by.
 
         In the future, the definition of "close" could be parameterized on
@@ -255,9 +255,9 @@ class FlightStability:
             # has_glide_scope = [int(l.value) for l in self.aq_has_glide_scope]
             # print(approach_active, has_localizer, has_glide_scope)
 
-            if last and clearance.next < close:
-                logging.info(f"Last waypoint and close: {clearance.next} nm")
-                approaching = True
+            #if last and clearance.next < close:
+            #    logging.info(f"Last waypoint and close: {clearance.next} nm")
+            #    approaching = True
 
             if last and too_low:
                 logging.info(f"Last waypoint and low")

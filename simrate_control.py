@@ -12,21 +12,24 @@ LOGGER = logging.getLogger(__name__)
 LOGGER.info("START")
 
 # Go above 4 at your own risk. Lots of porpoising.
-MAX_SIM_RATE=4
-MIN_SIM_RATE=1
+MAX_SIM_RATE = 4
+MIN_SIM_RATE = 1
 
 # If VSI crosses these values, slow down
 # Units are feet/s
-VSI_MAX = 5000 
+VSI_MAX = 5000
 VSI_MIN = -2000
+
 
 class SimConnectDataError(Exception):
     pass
 
-# A simple structure to hold distance from the previous and next waypoints
-WaypointClearance = namedtuple("WaypointClearances", 'prev next')
 
-class FlightStability():
+# A simple structure to hold distance from the previous and next waypoints
+WaypointClearance = namedtuple("WaypointClearances", "prev next")
+
+
+class FlightStability:
     def __init__(self, sm):
         self.sm = sm
         self.aq = AircraftRequests(self.sm)
@@ -51,15 +54,20 @@ class FlightStability():
         self.aq_approach_hold = self.aq.find("AUTOPILOT_APPROACH_HOLD")
         self.aq_approach_active = self.aq.find("GPS_IS_APPROACH_ACTIVE")
         self.aq_ete = self.aq.find("GPS_ETE")
-        #self.aq_nav_has_nav = [self.aq.find("NAV_HAS_NAV:1"), self.aq.find("NAV_HAS_NAV:2")]
-        self.aq_has_localizer = [self.aq.find("NAV_HAS_LOCALIZER:1"), self.aq.find("NAV_HAS_LOCALIZER:2")]
-        self.aq_has_glide_scope = [self.aq.find("NAV_HAS_GLIDE_SLOPE:1"), self.aq.find("NAV_HAS_GLIDE_SLOPE:2")]
+        # self.aq_nav_has_nav = [self.aq.find("NAV_HAS_NAV:1"), self.aq.find("NAV_HAS_NAV:2")]
+        self.aq_has_localizer = [
+            self.aq.find("NAV_HAS_LOCALIZER:1"),
+            self.aq.find("NAV_HAS_LOCALIZER:2"),
+        ]
+        self.aq_has_glide_scope = [
+            self.aq.find("NAV_HAS_GLIDE_SLOPE:1"),
+            self.aq.find("NAV_HAS_GLIDE_SLOPE:2"),
+        ]
         self.aq_nav_mode = self.aq.find("AUTOPILOT_NAV1_LOCK")
         self.aq_ground_speed = self.aq.find("GPS_GROUND_SPEED")
 
     def get_waypoint_distances(self):
-        """Get the distance to the previous and next FPL waypoints.
-        """
+        """Get the distance to the previous and next FPL waypoints."""
         try:
             prev_wp_lat = self.aq_prev_wp_lat.value
             prev_wp_lon = self.aq_prev_wp_lon.value
@@ -68,19 +76,20 @@ class FlightStability():
             next_wp_lat = self.aq_next_wp_lat.value
             next_wp_lon = self.aq_next_wp_lon.value
 
-            prev_clearance = distance.distance((prev_wp_lat, prev_wp_lon),
-                                (cur_lat, cur_long)).nm
-            next_clearance = distance.distance((next_wp_lat, next_wp_lon),
-                (cur_lat, cur_long)).nm
-            
-            return(WaypointClearance(prev_clearance, next_clearance))
+            prev_clearance = distance.distance(
+                (prev_wp_lat, prev_wp_lon), (cur_lat, cur_long)
+            ).nm
+            next_clearance = distance.distance(
+                (next_wp_lat, next_wp_lon), (cur_lat, cur_long)
+            ).nm
+
+            return WaypointClearance(prev_clearance, next_clearance)
         except ValueError:
             raise SimConnectDataError()
         except TypeError:
             raise SimConnectDataError()
 
-
-    def are_angles_aggressive(self, max_pitch = 7, max_bank = 5):
+    def are_angles_aggressive(self, max_pitch=7, max_bank=5):
         """Check to see if pitch and bank angles are "agressive."
 
         The default values seem to minimize sim rate induced porpoising and
@@ -90,7 +99,7 @@ class FlightStability():
         try:
             pitch = abs(degrees(self.aq_pitch.value))
             bank = abs(degrees(self.aq_bank.value))
-            if (pitch > max_pitch or bank > max_bank):
+            if pitch > max_pitch or bank > max_bank:
                 logging.info(f"Agressive angles detected: {pitch} deg {bank} deg")
                 agressive = True
             else:
@@ -101,21 +110,20 @@ class FlightStability():
 
         return agressive
 
-    def is_vs_aggressive(self, min_vs = -300, max_vs = 500):
+    def is_vs_aggressive(self, min_vs=-300, max_vs=500):
         """Check to see if the vertical speed is "aggressively" high or low.
 
-        Values are intended to detect and stop porposing. However, 
+        Values are intended to detect and stop porposing. However,
         `are_angles_aggressive` may be a better proxy.
         """
         agressive = True
         try:
             vsi = self.aq_vsi.value
-            if(vsi > min_vs and vsi < max_vs):
+            if vsi > min_vs and vsi < max_vs:
                 agressive = False
             else:
                 logging.info(f"Agressive VS detected: {vsi} ft/s")
                 agressive = True
-
 
         except TypeError:
             raise SimConnectDataError()
@@ -131,7 +139,7 @@ class FlightStability():
         try:
             sc_autopilot_active = self.aq_ap_master.value
             sc_nav_mode = self.aq_nav_mode.value
-            if(sc_autopilot_active and sc_nav_mode):
+            if sc_autopilot_active and sc_nav_mode:
                 ap_active = True
             else:
                 ap_active = False
@@ -139,7 +147,7 @@ class FlightStability():
 
         except TypeError:
             raise SimConnectDataError()
-        
+
         return ap_active
 
     def is_waypoints_valid(self):
@@ -147,17 +155,19 @@ class FlightStability():
             sc_is_prev_wp_valid = self.aq_is_prev_wp_valid.value
             sc_cur_waypoint_index = self.aq_cur_waypoint_index.value
             sc_num_waypoints = self.aq_num_waypoints.value
-            if (sc_is_prev_wp_valid and
-                sc_num_waypoints > 0 and
-                sc_cur_waypoint_index <= sc_num_waypoints):
+            if (
+                sc_is_prev_wp_valid
+                and sc_num_waypoints > 0
+                and sc_cur_waypoint_index <= sc_num_waypoints
+            ):
                 return True
         except TypeError:
             raise SimConnectDataError()
-        
+
         logging.info("No valid waypoints detected.")
         return False
 
-    def is_waypoint_close(self, prev_seconds = 30, next_seconds = 30):
+    def is_waypoint_close(self, prev_seconds=30, next_seconds=30):
         """Check is a waypoint is close by.
 
         In the future, the definition of "close" could be parameterized on
@@ -169,54 +179,53 @@ class FlightStability():
         """
         close = True
         try:
-            ground_speed = self.aq_ground_speed.value # units: meters/sec
-            mps_to_nmps = 5.4e-4 # one meter per second to 1 nautical mile per second
+            ground_speed = self.aq_ground_speed.value  # units: meters/sec
+            mps_to_nmps = 5.4e-4  # one meter per second to 1 nautical mile per second
             nautical_miles_per_second = ground_speed * mps_to_nmps
             previous_dist = nautical_miles_per_second * prev_seconds
             next_dist = nautical_miles_per_second * next_seconds
             clearance = self.get_waypoint_distances()
 
-            if (clearance.prev > previous_dist and clearance.next > next_dist):
+            if clearance.prev > previous_dist and clearance.next > next_dist:
                 close = False
             else:
-                logging.info(f"Close ({previous_dist}, {next_dist}) to waypoint: ({clearance.prev} nm, {clearance.next} nm)")
+                logging.info(
+                    f"Close ({previous_dist}, {next_dist}) to waypoint: ({clearance.prev} nm, {clearance.next} nm)"
+                )
         except TypeError:
             raise SimConnectDataError()
 
         return close
 
-    def is_too_low(self, low:int = 1000):
-        """Is the plan below `low` AGL
-        """
+    def is_too_low(self, low: int = 1000):
+        """Is the plan below `low` AGL"""
         try:
             agl = self.aq_agl.value
-            if (agl > low):
+            if agl > low:
                 return False
         except TypeError:
             raise SimConnectDataError()
-        
+
         logging.info(f"Plane close to ground: {agl} ft AGL")
         return True
 
     def is_last_waypoint(self):
-        """ Is the FMS tagerting the final waypoint?
-        """
+        """Is the FMS tagerting the final waypoint?"""
         cur_waypoint_index = self.aq_cur_waypoint_index.value
         num_waypoints = self.aq_num_waypoints.value
         try:
             # Don't really understand the indexing here...
-            # Indexes skip by twos, so you get 2, 4, 6...N-1, 
+            # Indexes skip by twos, so you get 2, 4, 6...N-1,
             # i.e. the last waypoint will be 7 not 8.
             # I don't know why the last waypoint violates the pattern.
-            if (cur_waypoint_index < (num_waypoints - 1)):
+            if cur_waypoint_index < (num_waypoints - 1):
                 return False
         except TypeError:
             raise SimConnectDataError()
 
-        
         return True
 
-    def is_approaching(self, close:float=25.0, low:int=3000):
+    def is_approaching(self, close: float = 25.0, low: int = 3000):
         """Checks several items to see if we are "arriving" because there are
         different ways a flight plan may be set up.
 
@@ -241,28 +250,28 @@ class FlightStability():
             autopilot_active = int(self.aq_ap_master.value)
             approach_hold = int(self.aq_approach_hold.value)
             approach_active = int(self.aq_approach_active.value)
-            
-            #has_localizer = [int(l.value) for l in self.aq_has_localizer]
-            #has_glide_scope = [int(l.value) for l in self.aq_has_glide_scope]
-            #print(approach_active, has_localizer, has_glide_scope)
 
-            if (last and clearance.next < close):
+            # has_localizer = [int(l.value) for l in self.aq_has_localizer]
+            # has_glide_scope = [int(l.value) for l in self.aq_has_glide_scope]
+            # print(approach_active, has_localizer, has_glide_scope)
+
+            if last and clearance.next < close:
                 logging.info(f"Last waypoint and close: {clearance.next} nm")
                 approaching = True
-            
-            if (last and too_low):
+
+            if last and too_low:
                 logging.info(f"Last waypoint and low")
                 approaching = True
 
-            if(self.aq_ete.value < 10*60):
+            if self.aq_ete.value < 10 * 60:
                 logging.info(f"Less than 10 minutes from destination")
                 approaching = True
 
-            if(autopilot_active and (approach_active or approach_hold)):
+            if autopilot_active and (approach_active or approach_hold):
                 logging.info("Approach is active or approach hold mode on")
                 approaching = True
 
-            #if(has_localizer[0] or has_localizer[1] or
+            # if(has_localizer[0] or has_localizer[1] or
             #    has_glide_scope[0] or has_glide_scope[1]):
             #    logging.info("Localizer or glide scope detected")
             #    approaching = True
@@ -280,26 +289,26 @@ class FlightStability():
         stable = None
         try:
             if flight_stability.is_waypoints_valid():
-                if (not self.is_ap_active()):
+                if not self.is_ap_active():
                     logging.info("Autopilot not enabled.")
                     stable = 1
-                elif(self.is_approaching()):
+                elif self.is_approaching():
                     logging.info("Arrival imminent.")
                     stable = 1
-                elif(self.are_angles_aggressive()):
+                elif self.are_angles_aggressive():
                     logging.info("Pitch or bank too high")
                     stable = 1
-                elif(self.is_too_low(1000)):
+                elif self.is_too_low(1000):
                     logging.info("Too close to ground.")
                     stable = 1
-                elif(self.is_waypoint_close()):
+                elif self.is_waypoint_close():
                     # The AP will switch waypoints several miles away to cut corners,
                     # so we slow down far enough away that we don't enter a turn prior
                     # to slowing down (4nm). To keep from speeding up immediately when
                     # a corner is cut we also give until 2.5nm after the switch
                     logging.info("Close to waypoint.")
                     stable = 2
-                elif(self.is_vs_aggressive(VSI_MIN, VSI_MAX)):
+                elif self.is_vs_aggressive(VSI_MIN, VSI_MAX):
                     # pitch/bank may be a better/suffcient proxy
                     logging.info("Vertical speed too high.")
                     stable = 2
@@ -316,10 +325,9 @@ class FlightStability():
         return stable
 
 
+class SimRateManager:
+    """Manages the game sim rate, and audible annuciations."""
 
-class SimRateManager():
-    """Manages the game sim rate, and audible annuciations.
-    """
     def __init__(self, sm, min_rate=1, max_rate=4):
         self.sm = sm
         self.aq = AircraftRequests(self.sm)
@@ -332,13 +340,11 @@ class SimRateManager():
         self.tts_engine = pyttsx3.init()
 
     def get_sim_rate(self):
-        """Get the current sim rate.
-        """
+        """Get the current sim rate."""
         return self.sc_sim_rate.value
 
     def say_sim_rate(self):
-        """Speak the current sim rate using text-to-speech
-        """
+        """Speak the current sim rate using text-to-speech"""
         try:
             simrate = self.get_sim_rate()
             self.tts_engine.say(f"Sim rate {str(int(simrate))}")
@@ -347,8 +353,7 @@ class SimRateManager():
             pass
 
     def stop_acceleration(self):
-        """Decrease the sim rate to the minimum
-        """
+        """Decrease the sim rate to the minimum"""
         simrate = self.get_sim_rate()
         if simrate is None:
             return
@@ -357,10 +362,8 @@ class SimRateManager():
             self.decelerate()
             simrate /= 2
 
-
     def decelerate(self):
-        """Decrease the sim rate, up to some maximum
-        """
+        """Decrease the sim rate, up to some maximum"""
         simrate = self.get_sim_rate()
         if simrate is None:
             return
@@ -370,8 +373,7 @@ class SimRateManager():
             self.increase_sim_rate()
 
     def accelerate(self):
-        """Increase the sim rate, up to some maximum
-        """
+        """Increase the sim rate, up to some maximum"""
         simrate = self.get_sim_rate()
         if simrate is None:
             return
@@ -380,9 +382,11 @@ class SimRateManager():
         elif simrate > self.max_rate:
             self.decrease_sim_rate()
 
-if __name__ == "__main__": 
+
+if __name__ == "__main__":
     import os
-    clear = lambda: os.system('cls') #on Windows System
+
+    clear = lambda: os.system("cls")  # on Windows System
     connected = False
     while not connected:
         clear()
@@ -422,7 +426,7 @@ if __name__ == "__main__":
                 logging.warning("DATA ERROR: DECEL")
                 srm.decelerate()
             finally:
-                sleep(.1)
+                sleep(0.1)
                 new_simrate = srm.get_sim_rate()
                 print("SIM RATE: ", new_simrate)
                 if prev_simrate != new_simrate:

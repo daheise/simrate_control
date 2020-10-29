@@ -2,12 +2,12 @@ from SimConnect import *
 from geopy import distance
 import logging
 from time import sleep
-import os
+import os, sys
 import pyttsx3
 from collections import namedtuple
 from math import radians, degrees
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger(__name__)
 LOGGER.info("START")
 
@@ -74,6 +74,8 @@ class FlightStability():
                 (cur_lat, cur_long)).nm
             
             return(WaypointClearance(prev_clearance, next_clearance))
+        except ValueError:
+            raise SimConnectDataError()
         except TypeError:
             raise SimConnectDataError()
 
@@ -155,7 +157,7 @@ class FlightStability():
         logging.info("No valid waypoints detected.")
         return False
 
-    def is_waypoint_close(self, prev_seconds = 60, next_seconds = 60):
+    def is_waypoint_close(self, prev_seconds = 30, next_seconds = 30):
         """Check is a waypoint is close by.
 
         In the future, the definition of "close" could be parameterized on
@@ -270,42 +272,43 @@ class FlightStability():
 
         return approaching
 
-    def is_flight_stable(self):
-        """Is the flight stable enough to increase the sim rate?
+    def get_max_sim_rate(self):
+        """Returns what is considered the maximum stable sim rate.
 
         Looks at a lot of factors.
         """
-        stable = False
+        stable = None
         try:
             if flight_stability.is_waypoints_valid():
                 if (not self.is_ap_active()):
                     logging.info("Autopilot not enabled.")
-                    stable = False
+                    stable = 1
                 elif(self.is_approaching()):
                     logging.info("Arrival imminent.")
-                    stable = False
+                    stable = 1
+                elif(self.are_angles_aggressive()):
+                    logging.info("Pitch or bank too high")
+                    stable = 1
+                elif(self.is_too_low(1000)):
+                    logging.info("Too close to ground.")
+                    stable = 1
                 elif(self.is_waypoint_close()):
                     # The AP will switch waypoints several miles away to cut corners,
                     # so we slow down far enough away that we don't enter a turn prior
                     # to slowing down (4nm). To keep from speeding up immediately when
                     # a corner is cut we also give until 2.5nm after the switch
                     logging.info("Close to waypoint.")
-                    stable = False
-                elif(self.is_too_low(1000)):
-                    logging.info("Too close to ground.")
-                    stable = False
-                elif(self.are_angles_aggressive()):
-                    logging.info("Pitch or bank too high")
-                    stable = False
+                    stable = 2
                 elif(self.is_vs_aggressive(VSI_MIN, VSI_MAX)):
                     # pitch/bank may be a better/suffcient proxy
                     logging.info("Vertical speed too high.")
-                    stable = False
+                    stable = 2
                 else:
                     logging.info("Flight stable")
-                    stable = True
+                    stable = 4
             else:
                 logging.warning("No valid flight plan. Stability undefined.")
+                stable = None
         except SimConnectDataError:
             logging.warning("DATA ERROR: DECEL")
             stable = False
@@ -377,51 +380,64 @@ class SimRateManager():
         elif simrate > self.max_rate:
             self.decrease_sim_rate()
 
-connected = False
-while not connected:
-    try:
-        sm = SimConnect()
-        connected = True
-        logging.info("Connected to simulator.")
-    except KeyboardInterrupt:
-        quit()
-    except:
-        logging.warning("Connection failed, retrying...")
-        sleep(5)
-
-srm = SimRateManager(sm, MIN_SIM_RATE, MAX_SIM_RATE)
-flight_stability = FlightStability(sm)
-
-try:
-    while True:
-        prev_simrate = srm.get_sim_rate()
+if __name__ == "__main__": 
+    import os
+    clear = lambda: os.system('cls') #on Windows System
+    connected = False
+    while not connected:
+        clear()
         try:
-            if flight_stability.is_flight_stable():
-                logging.info("accelerate")
-                srm.accelerate()
-            else:
-                logging.info("decelerate")
-                srm.decelerate()
+            sm = SimConnect()
+            connected = True
+            logging.info("Connected to simulator.")
         except KeyboardInterrupt:
-            raise KeyboardInterrupt
-        except SimConnectDataError:
-            logging.warning("DATA ERROR: DECEL")
-            srm.decelerate()
-        finally:
-            sleep(2)
-            new_simrate = srm.get_sim_rate()
-            if prev_simrate != new_simrate:
-                srm.say_sim_rate()
-                print("SIM RATE: ", prev_simrate, new_simrate)
-        
-except Exception as e:
-    print(type(e).__name__, e)
-finally:
-    simrate = srm.get_sim_rate()
-    srm.stop_acceleration()
-    sleep(1)
-    print(srm.get_sim_rate())
-    srm.say_sim_rate()
-    sm.exit()
+            quit()
+        except Exception as e:
+            print(type(e).__name__, e)
+            logging.warning("Connection failed, retrying...")
+            sleep(5)
 
-quit()
+    srm = SimRateManager(sm, MIN_SIM_RATE, MAX_SIM_RATE)
+    flight_stability = FlightStability(sm)
+
+    try:
+        while True:
+            clear()
+            prev_simrate = srm.get_sim_rate()
+            try:
+                max_stable_rate = flight_stability.get_max_sim_rate()
+                if max_stable_rate is None:
+                    raise SimConnectDataError()
+                elif max_stable_rate > prev_simrate:
+                    logging.info("accelerate")
+                    srm.accelerate()
+                elif max_stable_rate < prev_simrate:
+                    logging.info("decelerate")
+                    srm.decelerate()
+            except TypeError as e:
+                logging.warning(e)
+            except KeyboardInterrupt:
+                raise KeyboardInterrupt
+            except SimConnectDataError:
+                logging.warning("DATA ERROR: DECEL")
+                srm.decelerate()
+            finally:
+                sleep(.1)
+                new_simrate = srm.get_sim_rate()
+                print("SIM RATE: ", new_simrate)
+                if prev_simrate != new_simrate:
+                    srm.say_sim_rate()
+                sleep(2)
+    except KeyboardInterrupt:
+        pass
+    except Exception as e:
+        print(type(e).__name__, e)
+    finally:
+        simrate = srm.get_sim_rate()
+        srm.stop_acceleration()
+        sleep(1)
+        print(srm.get_sim_rate())
+        srm.say_sim_rate()
+        sm.exit()
+
+    sys.exit()

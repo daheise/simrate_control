@@ -9,3 +9,18 @@ aren't intended for production, more like personal notes.
   [SimRateBandit](https://github.com/dga711/msfs-simratebandit), I wanted the
   functionality more tailored to my own preferences. This may get receive more
   polish and get more intentional sharing in the future.
+
+## Installing SimRate Control
+1. Download the release zip file.
+2. Unzip in the location of your choice
+3. Run simrate_control.exe
+
+## Building from Source
+```
+pip install -r requirements.txt
+pyinstaller .\simrate_control.spec
+```
+
+**KNOWN BUILD ISSUE**
+PyInstaller searches for a file named `SimConnect/SimConnect.dllc`, but the dll is copied as `SimConnect/SimConnect.dll`. I don't know why PyInstaller is looking for an incorrect file extension. This can be fixed by renaming the file in `dist/SimConnect/SimConnect.dll` after
+building.

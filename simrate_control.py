@@ -1,13 +1,13 @@
-from SimConnect import *
-from geopy import distance
 import logging
-from time import sleep
 import os, sys
 import pyttsx3
+from time import sleep
+from SimConnect import *
+from geopy import distance
 from collections import namedtuple
-from math import radians, degrees
+from math import radians, degrees, ceil
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 LOGGER = logging.getLogger(__name__)
 LOGGER.info("START")
 
@@ -225,7 +225,38 @@ class FlightStability:
 
         return True
 
-    def is_approaching(self, close: float = 25.0, low: int = 3000):
+    def get_approach_minutes(self, final_fpm:int = 500,
+                             performance_exponent:float = 0.87,
+                             minimum:int = 5) -> float:
+        """Estimate the number of minutes needed for a successful arrival
+        based on AGL.
+        Parameters
+        ----------
+        final_fpm: Estimate of a typical descent speed on final.
+        performance_exponent: Exponent that represents whether to become more
+            or less conservative on your descent as altitude increases. 1.0
+            would indicate that you intend to descend at final_fpm dur the
+            entire descent. Less than one is higher descent speed at higher
+            altitude. Greater than 1 would be descending slower at higher
+            altitudes.
+        minimum: The minimum minutes this function will return.
+
+        Known Issue: This may cause some sim rate rubber banding as altitude
+        changes.
+        """
+        minutes = 0
+        try:
+            agl = self.aq_agl.value
+            minutes = (agl/final_fpm)**(performance_exponent)
+
+        except TypeError:
+            raise SimConnectDataError()
+
+        logging.debug(f"get_approach_minutes(): {agl} ft AGL, {minutes} min")
+        return max(minutes, minimum)
+
+
+    def is_approaching(self, close: float = 15.0, low: int = 3000):
         """Checks several items to see if we are "arriving" because there are
         different ways a flight plan may be set up.
 
@@ -255,16 +286,17 @@ class FlightStability:
             # has_glide_scope = [int(l.value) for l in self.aq_has_glide_scope]
             # print(approach_active, has_localizer, has_glide_scope)
 
-            #if last and clearance.next < close:
-            #    logging.info(f"Last waypoint and close: {clearance.next} nm")
-            #    approaching = True
+            if last and clearance.next < close:
+                logging.info(f"Last waypoint and close: {clearance.next} nm")
+                approaching = True
 
             if last and too_low:
                 logging.info(f"Last waypoint and low")
                 approaching = True
 
-            if self.aq_ete.value < 10 * 60:
-                logging.info(f"Less than 10 minutes from destination")
+            seconds = ceil(self.get_approach_minutes())*60
+            if self.aq_ete.value < seconds:
+                logging.info(f"Less than {seconds/60} minutes from destination")
                 approaching = True
 
             if autopilot_active and (approach_active or approach_hold):
@@ -434,6 +466,9 @@ if __name__ == "__main__":
                 sleep(2)
     except KeyboardInterrupt:
         pass
+    except OSError:
+        print("Flight Simulator exited. Shutting down.")
+        sys.exit()
     except Exception as e:
         print(type(e).__name__, e)
     finally:

@@ -41,7 +41,7 @@ potential for an undetected arrival or late arrival detection.
 
 1. The last leg of the flight plan is active, and the plane is 3000ft AGL or
    lower.
-2. ETE to destination is less than 10 minutes.
+2. ETE to destination is less than an estimate for top of descent.
 3. An approach procedure is active.
 4. Approach mode is active.
 
@@ -80,8 +80,7 @@ I can't upload this as a single EXE until I figure out how to fix this.
 
 ## TODO/Known Issues
 
+* This does notwork with the AirBus A320. AP never detected as active. I think it's not reporting GPS_NAV1_LOCK
 * I would like to give this a GUI, but that's not high on my priority list.
-* I would like better handling of arrivals and user input on how it feels. 10 minutes could be too long, or too short.
-* I have only tested this in a few GA planes. Feedback welcome.
 * Move specific detection threshold values to a configuration file.
 * Come up with a better name

@@ -85,4 +85,4 @@ I can't upload this as a single EXE until I figure out how to fix this.
 * Move specific detection threshold values to a configuration file.
 * Come up with a better name
 
-Most recently tested on: MSFS 2020 1.10.7.0
+Tested on: MSFS 2020 1.10.7.0

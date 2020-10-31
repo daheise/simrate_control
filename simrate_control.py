@@ -51,6 +51,8 @@ class FlightStability:
         self.aq_cur_waypoint_index = self.aq.find("GPS_FLIGHT_PLAN_WP_INDEX")
         self.aq_num_waypoints = self.aq.find("GPS_FLIGHT_PLAN_WP_COUNT")
         self.aq_agl = self.aq.find("PLANE_ALT_ABOVE_GROUND")
+        self.aq_nav_mode = self.aq.find("AUTOPILOT_NAV1_LOCK")
+        self.aq_heading_hold = self.aq.find("AUTOPILOT_HEADING_LOCK")
         self.aq_approach_hold = self.aq.find("AUTOPILOT_APPROACH_HOLD")
         self.aq_approach_active = self.aq.find("GPS_IS_APPROACH_ACTIVE")
         self.aq_ete = self.aq.find("GPS_ETE")
@@ -63,8 +65,8 @@ class FlightStability:
             self.aq.find("NAV_HAS_GLIDE_SLOPE:1"),
             self.aq.find("NAV_HAS_GLIDE_SLOPE:2"),
         ]
-        self.aq_nav_mode = self.aq.find("AUTOPILOT_NAV1_LOCK")
         self.aq_ground_speed = self.aq.find("GPS_GROUND_SPEED")
+        self.aq_title=self.aq.find("TITLE")
 
     def get_waypoint_distances(self):
         """Get the distance to the previous and next FPL waypoints."""
@@ -137,9 +139,17 @@ class FlightStability:
         """
         ap_active = False
         try:
-            sc_autopilot_active = self.aq_ap_master.value
-            sc_nav_mode = self.aq_nav_mode.value
+            sc_autopilot_active = int(self.aq_ap_master.value)
+            sc_nav_mode = int(self.aq_nav_mode.value)
+            sc_title = self.aq_title.value
             if sc_autopilot_active and sc_nav_mode:
+                ap_active = True
+            elif ("A320" in str(sc_title) and sc_autopilot_active):
+                # Workaround for A320 not reporting AUTOPILOT_NAV1_LOCK like
+                # other planes. A320 always reports
+                # AUTOPILOT_HEADING_LOCK==True and
+                # AUTOPILOT_NAV1_LOCK==False leaving no way to set the
+                # autopilot to disable time acceleration.
                 ap_active = True
             else:
                 ap_active = False

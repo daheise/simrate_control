@@ -84,3 +84,5 @@ I can't upload this as a single EXE until I figure out how to fix this.
 * I would like to give this a GUI, but that's not high on my priority list.
 * Move specific detection threshold values to a configuration file.
 * Come up with a better name
+
+Most recently tested on: MSFS 2020 1.10.7.0

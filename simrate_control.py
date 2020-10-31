@@ -7,7 +7,7 @@ from geopy import distance
 from collections import namedtuple
 from math import radians, degrees, ceil
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger(__name__)
 LOGGER.info("START")
 
@@ -226,7 +226,7 @@ class FlightStability:
         return True
 
     def get_approach_minutes(self, final_fpm:int = 500,
-                             performance_exponent:float = 0.87,
+                             performance_exponent:float = 0.75,
                              minimum:int = 5) -> float:
         """Estimate the number of minutes needed for a successful arrival
         based on AGL.

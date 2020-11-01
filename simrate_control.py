@@ -13,16 +13,6 @@ logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger(__name__)
 LOGGER.info("START")
 
-# Go above 4 at your own risk. Lots of porpoising.
-MAX_SIM_RATE = 4
-MIN_SIM_RATE = 1
-
-# If VSI crosses these values, slow down
-# Units are feet/s
-VSI_MAX = 5000
-VSI_MIN = -2000
-
-
 class SimConnectDataError(Exception):
     pass
 
@@ -40,7 +30,7 @@ class FlightStability:
             self.min_vsi = -2000
             self.max_bank = 5
             self.max_pitch = 7
-            self.waypoint_buffer = 4 #seconds
+            self.waypoint_buffer = 40 #seconds
             self.min_agl_cruise = 1000 #ft
 
             # These values relate to approach detection
@@ -482,7 +472,6 @@ class SimRateManager:
 if __name__ == "__main__":
     config = configparser.ConfigParser()
     config.read('config.ini')
-
 
     clear = lambda: os.system("cls")  # on Windows System
     connected = False

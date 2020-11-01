@@ -57,6 +57,11 @@ estimates.
 2. Unzip in the location of your choice
 3. Run simrate_control.exe
 
+## Configuration
+
+A configuration file to modify various thresholds is available in
+`simrate_controller/config.ini`.
+
 ## Building from Source
 
 ```

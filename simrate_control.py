@@ -1,11 +1,13 @@
 import logging
 import os, sys
-import pyttsx3
+import configparser
 from time import sleep
-from SimConnect import *
-from geopy import distance
 from collections import namedtuple
 from math import radians, degrees, ceil
+
+import pyttsx3
+from SimConnect import *
+from geopy import distance
 
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger(__name__)
@@ -30,8 +32,46 @@ WaypointClearance = namedtuple("WaypointClearances", "prev next")
 
 
 class FlightStability:
-    def __init__(self, sm):
+    def __init__(self, sm, config = None):
         self.sm = sm
+        self.config = config
+        if config is None or config.sections() == []:
+            self.max_vsi = 2000
+            self.min_vsi = -2000
+            self.max_bank = 5
+            self.max_pitch = 7
+            self.waypoint_buffer = 4 #seconds
+            self.min_agl_cruise = 1000 #ft
+
+            # These values relate to approach detection
+            self.min_agl_descent = 3000 #ft
+            self.destination_distance = 10 #nm
+            min_approach_time = 7 #minutes
+            # Top of descent is estimated as 
+            # ((altitude agl)/final_approach)**performance_exponent
+            # where ** is the exponentiation operator.
+            self.final_approach = 500 # fpm
+            self.performance_exponent = 0.75
+        else:
+            self.config = config
+            self.min_vsi = int(self.config['stability']['min_vsi'])
+            self.max_vsi = int(self.config['stability']['max_vsi'])
+            self.max_bank = int(self.config['stability']['max_bank'])
+            self.max_pitch = int(self.config['stability']['max_pitch'])
+            self.waypoint_buffer = int(self.config['stability']['waypoint_buffer']) #seconds
+            self.min_agl_cruise = int(self.config['stability']['min_agl_cruise']) #ft
+
+            # These values relate to approach detection
+            self.min_agl_descent = int(self.config['stability']['min_agl_descent']) #ft
+            self.destination_distance = float(self.config['stability']['destination_distance']) #nm
+            self.min_approach_time = int(self.config['stability']['min_approach_time']) #minutes
+            # Top of descent is estimated as 
+            # ((altitude agl)/final_approach)**performance_exponent
+            # where ** is the exponentiation operator.
+            self.final_approach = int(self.config['stability']['final_approach']) # fpm
+            self.performance_exponent = float(self.config['stability']['performance_exponent'])
+        
+
         self.aq = AircraftRequests(self.sm)
         # Load these all up for three reasons.
         # 1. These are static items
@@ -266,7 +306,9 @@ class FlightStability:
         return max(minutes, minimum)
 
 
-    def is_approaching(self, close: float = 15.0, low: int = 3000):
+    def is_approaching(self, close: float = 15.0, low: int = 3000,
+                       descent_fpm = 500, performance_exponent = 0.75,
+                       minimum_time = 5):
         """Checks several items to see if we are "arriving" because there are
         different ways a flight plan may be set up.
 
@@ -304,7 +346,8 @@ class FlightStability:
                 logging.info(f"Last waypoint and low")
                 approaching = True
 
-            seconds = ceil(self.get_approach_minutes())*60
+            seconds = ceil(self.get_approach_minutes(descent_fpm, performance_exponent,
+            minimum_time))*60
             if self.aq_ete.value < seconds:
                 logging.info(f"Less than {seconds/60} minutes from destination")
                 approaching = True
@@ -334,23 +377,26 @@ class FlightStability:
                 if not self.is_ap_active():
                     logging.info("Autopilot not enabled.")
                     stable = 1
-                elif self.is_approaching():
+                elif self.is_approaching(close=self.destination_distance,
+                    low=self.min_agl_descent, descent_fpm=self.final_approach,
+                    performance_exponent=self.performance_exponent,
+                    minimum_time=self.min_approach_time):
                     logging.info("Arrival imminent.")
                     stable = 1
-                elif self.are_angles_aggressive():
+                elif self.are_angles_aggressive(self.max_pitch, self.max_bank):
                     logging.info("Pitch or bank too high")
                     stable = 1
-                elif self.is_too_low(1000):
+                elif self.is_too_low(self.min_agl_cruise):
                     logging.info("Too close to ground.")
                     stable = 1
-                elif self.is_waypoint_close():
+                elif self.is_waypoint_close(self.waypoint_buffer, self.waypoint_buffer):
                     # The AP will switch waypoints several miles away to cut corners,
                     # so we slow down far enough away that we don't enter a turn prior
                     # to slowing down (4nm). To keep from speeding up immediately when
                     # a corner is cut we also give until 2.5nm after the switch
                     logging.info("Close to waypoint.")
                     stable = 2
-                elif self.is_vs_aggressive(VSI_MIN, VSI_MAX):
+                elif self.is_vs_aggressive(self.min_vsi, self.max_vsi):
                     # pitch/bank may be a better/suffcient proxy
                     logging.info("Vertical speed too high.")
                     stable = 2
@@ -370,12 +416,20 @@ class FlightStability:
 class SimRateManager:
     """Manages the game sim rate, and audible annuciations."""
 
-    def __init__(self, sm, min_rate=1, max_rate=4):
+    def __init__(self, sm, config = None):
         self.sm = sm
+        self.config = config
+        if config is None or config.sections() == []:
+            self.min_rate=1
+            self.max_rate=4
+        else:
+            self.config = config
+            self.min_rate = int(self.config['simrate']['min_rate'])
+            self.max_rate = int(self.config['simrate']['max_rate'])
+        
         self.aq = AircraftRequests(self.sm)
         self.ae = AircraftEvents(self.sm)
-        self.min_rate = min_rate
-        self.max_rate = max_rate
+        
         self.sc_sim_rate = self.aq.find("SIMULATION_RATE")
         self.increase_sim_rate = self.ae.find("SIM_RATE_INCR")
         self.decrease_sim_rate = self.ae.find("SIM_RATE_DECR")
@@ -426,7 +480,9 @@ class SimRateManager:
 
 
 if __name__ == "__main__":
-    import os
+    config = configparser.ConfigParser()
+    config.read('config.ini')
+
 
     clear = lambda: os.system("cls")  # on Windows System
     connected = False
@@ -443,8 +499,8 @@ if __name__ == "__main__":
             logging.warning("Connection failed, retrying...")
             sleep(5)
 
-    srm = SimRateManager(sm, MIN_SIM_RATE, MAX_SIM_RATE)
-    flight_stability = FlightStability(sm)
+    srm = SimRateManager(sm, config)
+    flight_stability = FlightStability(sm, config)
 
     try:
         while True:
@@ -466,7 +522,8 @@ if __name__ == "__main__":
                 raise KeyboardInterrupt
             except SimConnectDataError:
                 logging.warning("DATA ERROR: DECEL")
-                srm.decelerate()
+                if config.getboolean('simrate', 'decelerate_on_simconnect_error'):
+                    srm.decelerate()
             finally:
                 sleep(0.1)
                 new_simrate = srm.get_sim_rate()

@@ -69,13 +69,14 @@ pip install -r requirements.txt
 pyinstaller .\simrate_control.spec
 ```
 
-**KNOWN BUILD ISSUE** PyInstaller searches for a file named
-`SimConnect/SimConnect.dllc`, but the dll is copied as
-`SimConnect/SimConnect.dll`. I don't know why PyInstaller is looking for an
-incorrect file extension. This can be fixed by renaming the file in
-`dist/SimConnect/SimConnect.dll` after building.
+**KNOWN BUILD ISSUE** 
 
-I can't upload this as a single EXE until I figure out how to fix this.
+Python-SimConnect has an issue [with its DLL
+finding](https://github.com/odwdinc/Python-SimConnect/issues/65) causing the
+built executable to search for `SimConnect/SimConnect.dllc`. This can be fixed
+by renaming the file in `dist/SimConnect/SimConnect.dll` after building or
+[applying this fix
+locally](https://github.com/odwdinc/Python-SimConnect/pull/66)
 
 ## TODO/Known Issues
 

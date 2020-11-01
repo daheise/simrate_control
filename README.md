@@ -84,8 +84,6 @@ I can't upload this as a single EXE until I figure out how to fix this.
 * The A320 does not report GPS_NAV1_LOCK like the other aircraft. Therefore, if
   the AP is on then time acceleration is enabled.
   [Issue #2](https://github.com/daheise/msfs_utils/issues/2)
-* Move specific detection threshold values to a configuration file.
-  [Issue #4](https://github.com/daheise/msfs_utils/issues/4)
 * I would like to give this a GUI, but that's not high on my priority list.
   [Issue #3](https://github.com/daheise/msfs_utils/issues/3)
 

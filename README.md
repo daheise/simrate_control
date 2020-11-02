@@ -69,15 +69,6 @@ pip install -r requirements.txt
 pyinstaller .\simrate_control.spec
 ```
 
-**KNOWN BUILD ISSUE** 
-
-Python-SimConnect has an issue [with its DLL
-finding](https://github.com/odwdinc/Python-SimConnect/issues/65) causing the
-built executable to search for `SimConnect/SimConnect.dllc`. This can be fixed
-by renaming the file in `dist/SimConnect/SimConnect.dll` after building or
-[applying this fix
-locally](https://github.com/odwdinc/Python-SimConnect/pull/66)
-
 ## TODO/Known Issues
 
 * "Failed to load dynlib/dll '...\\simrate_control\\SimConnect\\SimConnect.dllc"

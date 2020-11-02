@@ -71,8 +71,6 @@ pyinstaller .\simrate_control.spec
 
 ## TODO/Known Issues
 
-* "Failed to load dynlib/dll '...\\simrate_control\\SimConnect\\SimConnect.dllc"
-  see [Issue #6](https://github.com/daheise/msfs_utils/issues/6)
 * The A320 does not report GPS_NAV1_LOCK like the other aircraft. Therefore, if
   the AP is on then time acceleration is enabled.
   [Issue #2](https://github.com/daheise/msfs_utils/issues/2)

@@ -60,7 +60,7 @@ estimates.
 ## Configuration
 
 A configuration file to modify various thresholds is available in
-`simrate_controller/config.ini`.
+`simrate_control/config.ini`.
 
 ## Building from Source
 

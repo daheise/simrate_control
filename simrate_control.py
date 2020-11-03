@@ -3,7 +3,7 @@ import os, sys
 import configparser
 from time import sleep
 from collections import namedtuple
-from math import radians, degrees, ceil, tan
+from math import radians, degrees, ceil, tan, sin
 
 import pyttsx3
 from SimConnect import *
@@ -272,11 +272,12 @@ class FlightStability:
         return True
 
     def target_descent_fpm(self):
-        # Convert m/s to nm/h
-        ground_speed = self.aq_ground_speed.value / 0.51444444444444
+        # https://code7700.com/rot_descent_vvi.htm
+        # Convert m/s to nm/min
+        ground_speed = (self.aq_ground_speed.value / 0.51444444444444)/60
         # rough calculation. I have also seen (ground_speed/2)*10
         # TODO: Change this based on descent angle
-        return ground_speed * 5
+        return ground_speed * 6076.118 * sin(radians(self.degrees_of_descent))
 
 
     def arrival_distance(self):
@@ -422,7 +423,7 @@ class FlightStability:
                     stable = 2
                 else:
                     logging.info("Flight stable")
-                    stable = 4
+                    stable = 16
             else:
                 logging.warning("No valid flight plan. Stability undefined.")
                 stable = None
@@ -434,7 +435,7 @@ class FlightStability:
 
 
 class SimRateManager:
-    """Manages the game sim rate, and audible annuciations."""
+    """Manages the game sim rate, and audible annunciation."""
 
     def __init__(self, sm, config = None):
         self.sm = sm
@@ -442,10 +443,12 @@ class SimRateManager:
         if config is None or config.sections() == []:
             self.min_rate=1
             self.max_rate=4
+            self.annunciation =True
         else:
             self.config = config
             self.min_rate = int(self.config['simrate']['min_rate'])
             self.max_rate = int(self.config['simrate']['max_rate'])
+            self.annunciation = config.getboolean('simrate', 'annunciation')
         
         self.aq = AircraftRequests(self.sm)
         self.ae = AircraftEvents(self.sm)
@@ -462,9 +465,15 @@ class SimRateManager:
 
     def say_sim_rate(self):
         """Speak the current sim rate using text-to-speech"""
+        if not self.annunciation:
+            return
+
         try:
             simrate = self.get_sim_rate()
-            self.tts_engine.say(f"Sim rate {str(int(simrate))}")
+            if simrate >= 1.0:
+                self.tts_engine.say(f"Sim rate {str(int(simrate))}")
+            else:
+                self.tts_engine.say(f"Sim rate {str(simrate)}")
             self.tts_engine.runAndWait()
         except TypeError:
             pass
@@ -532,7 +541,8 @@ if __name__ == "__main__":
             clear()
             prev_simrate = srm.get_sim_rate()
             try:
-                max_stable_rate = flight_stability.get_max_sim_rate()
+                max_stable_rate = min(flight_stability.get_max_sim_rate(),
+                                      int(config['simrate']['max_rate']))
                 if max_stable_rate is None:
                     raise SimConnectDataError()
                 #elif max_stable_rate == 0 and not have_paused_at_tod:

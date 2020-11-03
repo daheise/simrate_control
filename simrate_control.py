@@ -243,11 +243,11 @@ class FlightStability:
 
         return close
 
-    def is_too_low(self):
+    def is_too_low(self, low):
         """Is the plan below `low` AGL"""
         try:
             agl = self.aq_agl.value
-            if agl > self.min_agl_cruise:
+            if agl > low:
                 return False
         except TypeError:
             raise SimConnectDataError()
@@ -275,6 +275,7 @@ class FlightStability:
         # Convert m/s to nm/h
         ground_speed = self.aq_ground_speed.value / 0.51444444444444
         # rough calculation. I have also seen (ground_speed/2)*10
+        # TODO: Change this based on descent angle
         return ground_speed * 5
 
 
@@ -341,7 +342,7 @@ class FlightStability:
             clearance = self.get_waypoint_distances()
             last = self.is_last_waypoint()
             if last:
-                too_low = self.is_too_low()
+                too_low = self.is_too_low(self.min_agl_descent)
             else:
                 too_low = False
             autopilot_active = int(self.aq_ap_master.value)
@@ -405,7 +406,7 @@ class FlightStability:
                 elif self.are_angles_aggressive():
                     logging.info("Pitch or bank too high")
                     stable = 1
-                elif self.is_too_low():
+                elif self.is_too_low(self.min_agl_cruise):
                     logging.info("Too close to ground.")
                     stable = 1
                 elif self.is_waypoint_close():

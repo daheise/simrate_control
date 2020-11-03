@@ -3,7 +3,7 @@ import os, sys
 import configparser
 from time import sleep
 from collections import namedtuple
-from math import radians, degrees, ceil
+from math import radians, degrees, ceil, tan
 
 import pyttsx3
 from SimConnect import *
@@ -36,12 +36,14 @@ class FlightStability:
             # These values relate to approach detection
             self.min_agl_descent = 3000 #ft
             self.destination_distance = 10 #nm
-            min_approach_time = 7 #minutes
+            self.min_approach_time = 7 #minutes
             # Top of descent is estimated as 
-            # ((altitude agl)/final_approach)**performance_exponent
+            # ((altitude agl)/final_approach)**descent_safety_factor
             # where ** is the exponentiation operator.
-            self.final_approach = 500 # fpm
-            self.performance_exponent = 0.75
+            #self.final_approach = 500 # fpm
+            self.degrees_of_descent = 3
+            self.descent_safety_factor = 1.0
+            #self.pause_at_tod = False
         else:
             self.config = config
             self.min_vsi = int(self.config['stability']['min_vsi'])
@@ -56,12 +58,14 @@ class FlightStability:
             self.destination_distance = float(self.config['stability']['destination_distance']) #nm
             self.min_approach_time = int(self.config['stability']['min_approach_time']) #minutes
             # Top of descent is estimated as 
-            # ((altitude agl)/final_approach)**performance_exponent
+            # ((altitude agl)/final_approach)**descent_safety_factor
             # where ** is the exponentiation operator.
-            self.final_approach = int(self.config['stability']['final_approach']) # fpm
-            self.performance_exponent = float(self.config['stability']['performance_exponent'])
+            #self.final_approach = int(self.config['stability']['final_approach']) # fpm
+            self.degrees_of_descent = float(self.config['stability']['degrees_of_descent'])
+            self.descent_safety_factor = float(self.config['stability']['descent_safety_factor'])
+            #self.pause_at_tod = config.getboolean('stability', 'pause_at_tod')
         
-
+        self.have_paused_at_tod = False
         self.aq = AircraftRequests(self.sm)
         # Load these all up for three reasons.
         # 1. These are static items
@@ -73,6 +77,7 @@ class FlightStability:
         self.aq_cur_long = self.aq.find("GPS_POSITION_LON")
         self.aq_next_wp_lat = self.aq.find("GPS_WP_NEXT_LAT")
         self.aq_next_wp_lon = self.aq.find("GPS_WP_NEXT_LON")
+        self.aq_next_wp_alt = self.aq.find("GPS_WP_NEXT_ALT")
         self.aq_pitch = self.aq.find("PLANE_PITCH_DEGREES")
         self.aq_bank = self.aq.find("PLANE_BANK_DEGREES")
         self.aq_vsi = self.aq.find("VERTICAL_SPEED")
@@ -81,6 +86,7 @@ class FlightStability:
         self.aq_cur_waypoint_index = self.aq.find("GPS_FLIGHT_PLAN_WP_INDEX")
         self.aq_num_waypoints = self.aq.find("GPS_FLIGHT_PLAN_WP_COUNT")
         self.aq_agl = self.aq.find("PLANE_ALT_ABOVE_GROUND")
+        self.aq_alt = self.aq.find("PLANE_ALTITUDE")
         self.aq_nav_mode = self.aq.find("AUTOPILOT_NAV1_LOCK")
         self.aq_heading_hold = self.aq.find("AUTOPILOT_HEADING_LOCK")
         self.aq_approach_hold = self.aq.find("AUTOPILOT_APPROACH_HOLD")
@@ -121,7 +127,7 @@ class FlightStability:
         except TypeError:
             raise SimConnectDataError()
 
-    def are_angles_aggressive(self, max_pitch=7, max_bank=5):
+    def are_angles_aggressive(self):
         """Check to see if pitch and bank angles are "agressive."
 
         The default values seem to minimize sim rate induced porpoising and
@@ -131,7 +137,7 @@ class FlightStability:
         try:
             pitch = abs(degrees(self.aq_pitch.value))
             bank = abs(degrees(self.aq_bank.value))
-            if pitch > max_pitch or bank > max_bank:
+            if pitch > self.max_pitch or bank > self.max_bank:
                 logging.info(f"Agressive angles detected: {pitch} deg {bank} deg")
                 agressive = True
             else:
@@ -142,7 +148,7 @@ class FlightStability:
 
         return agressive
 
-    def is_vs_aggressive(self, min_vs=-300, max_vs=500):
+    def is_vs_aggressive(self):
         """Check to see if the vertical speed is "aggressively" high or low.
 
         Values are intended to detect and stop porposing. However,
@@ -151,7 +157,7 @@ class FlightStability:
         agressive = True
         try:
             vsi = self.aq_vsi.value
-            if vsi > min_vs and vsi < max_vs:
+            if vsi > self.min_vsi and vsi < self.max_vsi:
                 agressive = False
             else:
                 logging.info(f"Agressive VS detected: {vsi} ft/s")
@@ -207,7 +213,7 @@ class FlightStability:
         logging.info("No valid waypoints detected.")
         return False
 
-    def is_waypoint_close(self, prev_seconds=40, next_seconds=40):
+    def is_waypoint_close(self):
         """Check is a waypoint is close by.
 
         In the future, the definition of "close" could be parameterized on
@@ -222,8 +228,8 @@ class FlightStability:
             ground_speed = self.aq_ground_speed.value  # units: meters/sec
             mps_to_nmps = 5.4e-4  # one meter per second to 1 nautical mile per second
             nautical_miles_per_second = ground_speed * mps_to_nmps
-            previous_dist = nautical_miles_per_second * prev_seconds
-            next_dist = nautical_miles_per_second * next_seconds
+            previous_dist = nautical_miles_per_second * self.waypoint_buffer
+            next_dist = nautical_miles_per_second * self.waypoint_buffer
             clearance = self.get_waypoint_distances()
 
             if clearance.prev > previous_dist and clearance.next > next_dist:
@@ -237,11 +243,11 @@ class FlightStability:
 
         return close
 
-    def is_too_low(self, low: int = 1000):
+    def is_too_low(self):
         """Is the plan below `low` AGL"""
         try:
             agl = self.aq_agl.value
-            if agl > low:
+            if agl > self.min_agl_cruise:
                 return False
         except TypeError:
             raise SimConnectDataError()
@@ -265,40 +271,58 @@ class FlightStability:
 
         return True
 
-    def get_approach_minutes(self, final_fpm:int = 500,
-                             performance_exponent:float = 0.75,
-                             minimum:int = 5) -> float:
-        """Estimate the number of minutes needed for a successful arrival
-        based on AGL.
-        Parameters
-        ----------
-        final_fpm: Estimate of a typical descent speed on final.
-        performance_exponent: Exponent that represents whether to become more
-            or less conservative on your descent as altitude increases. 1.0
-            would indicate that you intend to descend at final_fpm dur the
-            entire descent. Less than one is higher descent speed at higher
-            altitude. Greater than 1 would be descending slower at higher
-            altitudes.
-        minimum: The minimum minutes this function will return.
-
-        Known Issue: This may cause some sim rate rubber banding as altitude
-        changes.
-        """
-        minutes = 0
-        try:
-            agl = self.aq_agl.value
-            minutes = (agl/final_fpm)**(performance_exponent)
-
-        except TypeError:
-            raise SimConnectDataError()
-
-        logging.debug(f"get_approach_minutes(): {agl} ft AGL, {minutes} min")
-        return max(minutes, minimum)
+    def target_descent_fpm(self):
+        # Convert m/s to nm/h
+        ground_speed = self.aq_ground_speed.value / 0.51444444444444
+        # rough calculation. I have also seen (ground_speed/2)*10
+        return ground_speed * 5
 
 
-    def is_approaching(self, close: float = 15.0, low: int = 3000,
-                       descent_fpm = 500, performance_exponent = 0.75,
-                       minimum_time = 5):
+    def arrival_distance(self):
+        # https://www.thinkaviation.net/top-of-descent-calculation/
+        # height above pattern altitude
+        total_descent = abs(self.aq_alt.value - (self.aq_next_wp_alt.value))
+        feet_to_nm = 6076.118
+        # Solve the triangle to get a chosen degree of descent
+        distance = (total_descent/tan(radians(self.degrees_of_descent)))/feet_to_nm
+        return distance*self.descent_safety_factor
+
+    # def get_approach_minutes(self) -> float:
+    #     """Estimate the number of minutes needed for a successful arrival
+    #     based on AGL.
+    #     Parameters
+    #     ----------
+    #     final_fpm: Estimate of a typical descent speed on final.
+    #     performance_exponent: Exponent that represents whether to become more
+    #         or less conservative on your descent as altitude increases. 1.0
+    #         would indicate that you intend to descend at final_fpm dur the
+    #         entire descent. Less than one is higher descent speed at higher
+    #         altitude. Greater than 1 would be descending slower at higher
+    #         altitudes.
+    #     minimum: The minimum minutes this function will return.
+
+    #     Known Issue: This may cause some sim rate rubber banding as altitude
+    #     changes.
+    #     """
+    #     minutes = 0
+    #     try:
+    #         agl = self.aq_agl.value
+    #         minutes = (agl/self.final_fpm)**(self.performance_exponent)
+
+    #     except TypeError:
+    #         raise SimConnectDataError()
+
+    #     logging.debug(f"get_approach_minutes(): {agl} ft AGL, {minutes} min")
+    #     return max(minutes, self.min_approach_time)
+
+    def is_past_tod(self):
+        distance_to_dest = self.get_waypoint_distances()
+        if distance_to_dest < self.arrival_distance():
+            return True
+        else:
+            return False
+
+    def is_approaching(self):
         """Checks several items to see if we are "arriving" because there are
         different ways a flight plan may be set up.
 
@@ -317,7 +341,7 @@ class FlightStability:
             clearance = self.get_waypoint_distances()
             last = self.is_last_waypoint()
             if last:
-                too_low = self.is_too_low(low)
+                too_low = self.is_too_low()
             else:
                 too_low = False
             autopilot_active = int(self.aq_ap_master.value)
@@ -327,17 +351,19 @@ class FlightStability:
             # has_localizer = [int(l.value) for l in self.aq_has_localizer]
             # has_glide_scope = [int(l.value) for l in self.aq_has_glide_scope]
             # print(approach_active, has_localizer, has_glide_scope)
-
-            if last and clearance.next < close:
-                logging.info(f"Last waypoint and close: {clearance.next} nm")
+            min_distance = max(self.arrival_distance(), self.destination_distance)
+            if last and clearance.next < min_distance:
+                logging.info(f"Descent phase detected: {clearance.next} nm, TOD: {self.arrival_distance()}")
+                logging.info(f"Target {self.degrees_of_descent} degree FPM: -{self.target_descent_fpm()} nm")
                 approaching = True
 
             if last and too_low:
                 logging.info(f"Last waypoint and low")
                 approaching = True
 
-            seconds = ceil(self.get_approach_minutes(descent_fpm, performance_exponent,
-            minimum_time))*60
+            #seconds = ceil(self.get_approach_minutes(descent_fpm, performance_exponent,
+            #minimum_time))*60
+            seconds = self.min_approach_time * 60
             if self.aq_ete.value < seconds:
                 logging.info(f"Less than {seconds/60} minutes from destination")
                 approaching = True
@@ -367,26 +393,29 @@ class FlightStability:
                 if not self.is_ap_active():
                     logging.info("Autopilot not enabled.")
                     stable = 1
-                elif self.is_approaching(close=self.destination_distance,
-                    low=self.min_agl_descent, descent_fpm=self.final_approach,
-                    performance_exponent=self.performance_exponent,
-                    minimum_time=self.min_approach_time):
+                #elif (self.pause_at_tod and not self.have_paused_at_tod 
+                #      and self.is_past_tod(self.degrees_of_descent,
+                #                           self.descent_safety_factor)):
+                #    logging.info("Reached TOD; pause")
+                #    self.have_paused_at_tod = True
+                #    stable = 0
+                elif self.is_approaching():
                     logging.info("Arrival imminent.")
                     stable = 1
-                elif self.are_angles_aggressive(self.max_pitch, self.max_bank):
+                elif self.are_angles_aggressive():
                     logging.info("Pitch or bank too high")
                     stable = 1
-                elif self.is_too_low(self.min_agl_cruise):
+                elif self.is_too_low():
                     logging.info("Too close to ground.")
                     stable = 1
-                elif self.is_waypoint_close(self.waypoint_buffer, self.waypoint_buffer):
+                elif self.is_waypoint_close():
                     # The AP will switch waypoints several miles away to cut corners,
                     # so we slow down far enough away that we don't enter a turn prior
                     # to slowing down (4nm). To keep from speeding up immediately when
                     # a corner is cut we also give until 2.5nm after the switch
                     logging.info("Close to waypoint.")
                     stable = 2
-                elif self.is_vs_aggressive(self.min_vsi, self.max_vsi):
+                elif self.is_vs_aggressive():
                     # pitch/bank may be a better/suffcient proxy
                     logging.info("Vertical speed too high.")
                     stable = 2
@@ -423,6 +452,7 @@ class SimRateManager:
         self.sc_sim_rate = self.aq.find("SIMULATION_RATE")
         self.increase_sim_rate = self.ae.find("SIM_RATE_INCR")
         self.decrease_sim_rate = self.ae.find("SIM_RATE_DECR")
+        self.ae_pause = self.ae.find("PAUSE_ON")
         self.tts_engine = pyttsx3.init()
 
     def get_sim_rate(self):
@@ -437,6 +467,10 @@ class SimRateManager:
             self.tts_engine.runAndWait()
         except TypeError:
             pass
+
+    def pause(self):
+        """Pause the sim"""
+        self.ae_pause()
 
     def stop_acceleration(self):
         """Decrease the sim rate to the minimum"""
@@ -492,6 +526,7 @@ if __name__ == "__main__":
     flight_stability = FlightStability(sm, config)
 
     try:
+        have_paused_at_tod = False
         while True:
             clear()
             prev_simrate = srm.get_sim_rate()
@@ -499,6 +534,9 @@ if __name__ == "__main__":
                 max_stable_rate = flight_stability.get_max_sim_rate()
                 if max_stable_rate is None:
                     raise SimConnectDataError()
+                #elif max_stable_rate == 0 and not have_paused_at_tod:
+                #    have_paused_at_tod = True
+                #    srm.pause()
                 elif max_stable_rate > prev_simrate:
                     logging.info("accelerate")
                     srm.accelerate()

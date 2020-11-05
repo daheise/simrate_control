@@ -482,8 +482,9 @@ class SimRateManager:
     def pause(self):
         """Pause the sim"""
         self.ae_pause()
-        self.tts_engine.say(f"Paused at todd")
-        self.tts_engine.runAndWait()
+        if self.annunciation:
+            self.tts_engine.say(f"Paused at todd")
+            self.tts_engine.runAndWait()
 
     def stop_acceleration(self):
         """Decrease the sim rate to the minimum"""

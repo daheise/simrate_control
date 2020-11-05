@@ -43,7 +43,7 @@ class FlightStability:
             #self.final_approach = 500 # fpm
             self.degrees_of_descent = 3
             self.descent_safety_factor = 1.0
-            #self.pause_at_tod = False
+            self.pause_at_tod = False
         else:
             self.config = config
             self.min_vsi = int(self.config['stability']['min_vsi'])
@@ -63,7 +63,7 @@ class FlightStability:
             #self.final_approach = int(self.config['stability']['final_approach']) # fpm
             self.degrees_of_descent = float(self.config['stability']['degrees_of_descent'])
             self.descent_safety_factor = float(self.config['stability']['descent_safety_factor'])
-            #self.pause_at_tod = config.getboolean('stability', 'pause_at_tod')
+            self.pause_at_tod = config.getboolean('stability', 'pause_at_tod')
         
         self.have_paused_at_tod = False
         self.aq = AircraftRequests(self.sm)
@@ -318,11 +318,13 @@ class FlightStability:
     #     return max(minutes, self.min_approach_time)
 
     def is_past_tod(self):
-        distance_to_dest = self.get_waypoint_distances()
-        if distance_to_dest < self.arrival_distance():
-            return True
-        else:
-            return False
+        try:
+            distance_to_dest = self.get_waypoint_distances()[1]
+            if distance_to_dest < self.arrival_distance():
+                return True
+        except:
+            pass
+        return False
 
     def is_approaching(self):
         """Checks several items to see if we are "arriving" because there are
@@ -395,15 +397,14 @@ class FlightStability:
                 if not self.is_ap_active():
                     logging.info("Autopilot not enabled.")
                     stable = 1
-                #elif (self.pause_at_tod and not self.have_paused_at_tod 
-                #      and self.is_past_tod(self.degrees_of_descent,
-                #                           self.descent_safety_factor)):
-                #    logging.info("Reached TOD; pause")
-                #    self.have_paused_at_tod = True
-                #    stable = 0
                 elif self.is_approaching():
+                    if self.pause_at_tod and not self.have_paused_at_tod:
+                        self.have_paused_at_tod = True
+                        logging.info("Pause at TOD.")
+                        stable = 0
+                    else:
+                        stable = 1
                     logging.info("Arrival imminent.")
-                    stable = 1
                 elif self.are_angles_aggressive():
                     logging.info("Pitch or bank too high")
                     stable = 1
@@ -481,6 +482,9 @@ class SimRateManager:
     def pause(self):
         """Pause the sim"""
         self.ae_pause()
+        if self.annunciation:
+            self.tts_engine.say(f"Paused at todd")
+            self.tts_engine.runAndWait()
 
     def stop_acceleration(self):
         """Decrease the sim rate to the minimum"""
@@ -545,9 +549,9 @@ if __name__ == "__main__":
                                       int(config['simrate']['max_rate']))
                 if max_stable_rate is None:
                     raise SimConnectDataError()
-                #elif max_stable_rate == 0 and not have_paused_at_tod:
-                #    have_paused_at_tod = True
-                #    srm.pause()
+                elif max_stable_rate == 0 and not have_paused_at_tod:
+                    have_paused_at_tod = True
+                    srm.pause()
                 elif max_stable_rate > prev_simrate:
                     logging.info("accelerate")
                     srm.accelerate()

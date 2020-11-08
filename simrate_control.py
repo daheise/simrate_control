@@ -391,7 +391,7 @@ class FlightStability:
 
         Looks at a lot of factors.
         """
-        stable = None
+        stable = 1
         try:
             if flight_stability.is_waypoints_valid():
                 if not self.is_ap_active():
@@ -427,10 +427,10 @@ class FlightStability:
                     stable = 16
             else:
                 logging.warning("No valid flight plan. Stability undefined.")
-                stable = None
+                stable = 1
         except SimConnectDataError:
             logging.warning("DATA ERROR: DECEL")
-            stable = False
+            stable = 1
 
         return stable
 

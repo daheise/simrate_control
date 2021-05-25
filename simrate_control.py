@@ -372,7 +372,7 @@ class FlightStability:
                 logging.info(f"Less than {seconds/60} minutes from destination")
                 approaching = True
 
-            if autopilot_active and (approach_active or approach_hold):
+            if autopilot_active and approach_hold:
                 logging.info("Approach is active or approach hold mode on")
                 approaching = True
 

@@ -3,7 +3,7 @@ import os, sys
 import configparser
 from time import sleep
 from collections import namedtuple
-from math import radians, degrees, ceil, tan, sin
+from math import radians, degrees, ceil, tan, sin, asin
 
 import pyttsx3
 from SimConnect import *
@@ -91,7 +91,10 @@ class FlightStability:
         self.aq_heading_hold = self.aq.find("AUTOPILOT_HEADING_LOCK")
         self.aq_approach_hold = self.aq.find("AUTOPILOT_APPROACH_HOLD")
         self.aq_approach_active = self.aq.find("GPS_IS_APPROACH_ACTIVE")
+        self.aq_destiantion_airport = self.aq.find("GPS_APPROACH_AIRPORT_ID")
         self.aq_ete = self.aq.find("GPS_ETE")
+        self.aq_decision_height = self.aq.find("DECISION_HEIGHT")
+        self.aq_decision_alt = self.aq.find("DECISION_ALTITUDE_MSL")
         # self.aq_nav_has_nav = [self.aq.find("NAV_HAS_NAV:1"), self.aq.find("NAV_HAS_NAV:2")]
         self.aq_has_localizer = [
             self.aq.find("NAV_HAS_LOCALIZER:1"),
@@ -271,23 +274,49 @@ class FlightStability:
 
         return True
 
+    def ground_speed(self):
+        # Convert m/s to nm/s
+        ground_speed = self.aq_ground_speed.value * 5.4e-4
+        return ground_speed
+
     def target_descent_fpm(self):
         # https://code7700.com/rot_descent_vvi.htm
-        # Convert m/s to nm/min
-        ground_speed = (self.aq_ground_speed.value / 0.51444444444444)/60
-        # rough calculation. I have also seen (ground_speed/2)*10
+        # Convert to nm/min
+        ground_speed = self.ground_speed()*60
+        # rough calculation. I have also seen (ground_speed(knots)/2)*10
         # TODO: Change this based on descent angle
         return ground_speed * 6076.118 * sin(radians(self.degrees_of_descent))
 
+    def required_descent_fpm(self):
+        # https://code7700.com/rot_descent_vvi.htm
+        # Convert to nm/min
+        ground_speed = self.ground_speed()*60
+        # rough calculation. I have also seen (ground_speed(knots)/2)*10
+        # TODO: Change this based on descent angle
+        total_descent = abs(self.aq_alt.value - (self.aq_next_wp_alt.value*3.28084))
+        arrival_distance = self.get_waypoint_distances()[1]*6076.118
+        fpm = 0
+        try:
+            fpm = ground_speed * 6076.118 * asin(total_descent/arrival_distance)
+        except ValueError:
+            pass
+        return fpm
 
     def arrival_distance(self):
+        # distance in nm
         # https://www.thinkaviation.net/top-of-descent-calculation/
-        # height above pattern altitude
-        total_descent = abs(self.aq_alt.value - (self.aq_next_wp_alt.value))
+        # Current alt is in feet. Waypoint alt is in meters.
+        # Convert next waypoint to feet.
+        total_descent = abs(self.aq_alt.value - (self.aq_next_wp_alt.value*3.28084))
         feet_to_nm = 6076.118
         # Solve the triangle to get a chosen degree of descent
         distance = (total_descent/tan(radians(self.degrees_of_descent)))/feet_to_nm
         return distance*self.descent_safety_factor
+
+    def distance_to_destination(self):
+        # Distance in nm
+        dist = self.ground_speed()*self.aq_ete.value
+        return dist
 
     # def get_approach_minutes(self) -> float:
     #     """Estimate the number of minutes needed for a successful arrival
@@ -319,8 +348,17 @@ class FlightStability:
 
     def is_past_tod(self):
         try:
-            distance_to_dest = self.get_waypoint_distances()[1]
-            if distance_to_dest < self.arrival_distance():
+            #distance_to_dest = self.get_waypoint_distances()[1]
+            if self.distance_to_destination() < self.arrival_distance():
+                return True
+        except:
+            pass
+        return False
+
+    def is_past_leg_descent(self):
+        try:
+            #distance_to_dest = self.get_waypoint_distances()[1]
+            if self.get_waypoint_distances().next < self.arrival_distance():
                 return True
         except:
             pass
@@ -332,9 +370,10 @@ class FlightStability:
 
         These count as arriving:
         1. Within `close`nm of the final waypoint
-        2. AGL < low and last waypoint is active
-        2. An "approach" is active
-        3. "Approach" mode is active on the AP
+        2. AGL < min_agl_descent and last waypoint is active
+        3. The aircraft is beyond the top of descent for the next waypoint.
+        4. The aircraft is beyond the top of descent for the destination.
+        5. "Approach" mode is active on the AP
 
         More to consider:
         1. NAV has picked up a localizer signal
@@ -342,23 +381,33 @@ class FlightStability:
         """
         approaching = False
         try:
+            logging.info(f"{self.aq_ete.value/60} minutes")
             clearance = self.get_waypoint_distances()
             last = self.is_last_waypoint()
             if last:
                 too_low = self.is_too_low(self.min_agl_descent)
             else:
                 too_low = False
-            autopilot_active = int(self.aq_ap_master.value)
-            approach_hold = int(self.aq_approach_hold.value)
-            approach_active = int(self.aq_approach_active.value)
+            autopilot_active = bool(self.aq_ap_master.value)
+            approach_hold = bool(self.aq_approach_hold.value)
+            #approach_active = bool(self.aq_approach_active.value)
 
             # has_localizer = [int(l.value) for l in self.aq_has_localizer]
             # has_glide_scope = [int(l.value) for l in self.aq_has_glide_scope]
             # print(approach_active, has_localizer, has_glide_scope)
-            min_distance = max(self.arrival_distance(), self.destination_distance)
-            if last and clearance.next < min_distance:
-                logging.info(f"Descent phase detected: {clearance.next} nm, TOD: {self.arrival_distance()}")
-                logging.info(f"Target {self.degrees_of_descent} degree FPM: -{self.target_descent_fpm()} nm")
+            #min_distance = max(self.arrival_distance(), self.destination_distance)
+            #if (((last or approach_active) and self.is_past_tod()) or
+            if (self.is_past_leg_descent() or self.is_past_tod() or
+                (self.distance_to_destination() < self.destination_distance)):
+                logging.info("Beyond top of a descent.")
+                logging.info("Estimated descent parameters:")
+                logging.info(f"Current alt: {self.aq_alt.value}")
+                logging.info(f"Next waypont alt: {self.aq_next_wp_alt.value*3.28084}")
+                logging.info(f"Distance to next waypoint: {clearance.next} nm")
+                logging.info(f"Distance needed: {self.arrival_distance()/self.descent_safety_factor}")
+                logging.info(f"Glideslope {self.degrees_of_descent} degrees")
+                logging.info(f"3 degree FPM: -{self.target_descent_fpm()} fpm")
+                logging.info(f"Needed FPM: -{self.required_descent_fpm()} fpm")
                 approaching = True
 
             if last and too_low:
@@ -367,13 +416,20 @@ class FlightStability:
 
             #seconds = ceil(self.get_approach_minutes(descent_fpm, performance_exponent,
             #minimum_time))*60
+
+#            if approach_active and self.is_past_tod():
+                # logging.info("Plane is descending slow while on approach.")
+                # logging.info(f"Target {self.degrees_of_descent} degree FPM: -{self.target_descent_fpm()} fpm")
+                # logging.info(f"Current Rate: {self.aq_vsi.value} fpm")
+                # approaching = True
+
             seconds = self.min_approach_time * 60
             if self.aq_ete.value < seconds:
                 logging.info(f"Less than {seconds/60} minutes from destination")
                 approaching = True
 
             if autopilot_active and approach_hold:
-                logging.info("Approach is active or approach hold mode on")
+                logging.info("Approach hold mode on")
                 approaching = True
 
             # if(has_localizer[0] or has_localizer[1] or

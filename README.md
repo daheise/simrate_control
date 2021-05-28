@@ -94,7 +94,6 @@ pip install -r requirements.txt
 pyinstaller .\simrate_control.spec
 ```
 
-
 ## TODO/Known Issues
 
 * The A320 does not report GPS_NAV1_LOCK like the other aircraft. Therefore, if
@@ -102,8 +101,10 @@ pyinstaller .\simrate_control.spec
   [Issue #2](https://github.com/daheise/msfs_utils/issues/2)
 * I would like to give this a GUI, but that's not high on my priority list.
   [Issue #3](https://github.com/daheise/msfs_utils/issues/3)
+* Any addon aircraft that does not provide the simvars used for default
+  aircraft (e.g. Working Title CJ4)
 
-Tested on: MSFS 2020 1.10.7.0
+Tested on: MSFS 2020 1.16.2.0
 
 ### Acknowledgements
 

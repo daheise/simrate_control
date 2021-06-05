@@ -281,6 +281,15 @@ class FlightStability:
         ground_speed = self.aq_ground_speed.value * 5.4e-4
         return ground_speed
 
+    def target_altitude_change(self):
+        next_alt = self.aq_next_wp_alt.value
+        # If the next waypoint is zero feet then the altitude just isn't set,
+        # so take AGL as a (hopefully) sane value of descent.
+        if abs(next_alt) > 100:
+            total_descent = (self.aq_next_wp_alt.value*3.28084) - self.aq_alt.value
+        else:
+            total_descent =  self.aq_agl.value
+
     def target_fpm(self, angle):
         # https://code7700.com/rot_descent_vvi.htm
         # Convert to nm/min
@@ -294,11 +303,10 @@ class FlightStability:
         # Convert to nm/min
         ground_speed = self.ground_speed()*60
         # rough calculation. I have also seen (ground_speed(knots)/2)*10
-        total_descent = (self.aq_next_wp_alt.value*3.28084) - self.aq_alt.value
         arrival_distance = self.get_waypoint_distances()[1]*6076.118
         fpm = 0
         try:
-            fpm = ground_speed * 6076.118 * asin(total_descent/arrival_distance)
+            fpm = ground_speed * 6076.118 * asin(self.target_altitude_change()/arrival_distance)
         except ValueError:
             pass
         return fpm
@@ -308,7 +316,7 @@ class FlightStability:
         # https://www.thinkaviation.net/top-of-descent-calculation/
         # Current alt is in feet. Waypoint alt is in meters.
         # Convert next waypoint to feet.
-        total_descent = self.aq_alt.value - (self.aq_next_wp_alt.value*3.28084)
+        total_descent =  self.target_altitude_change()
         feet_to_nm = 6076.118
         # Solve the triangle to get a chosen degree of descent
         if total_descent < 0:
@@ -390,7 +398,6 @@ class FlightStability:
         """
         approaching = False
         try:
-            logging.info(f"{self.aq_ete.value/60} minutes")
             clearance = self.get_waypoint_distances()
             last = self.is_last_waypoint()
             if last:
@@ -411,7 +418,8 @@ class FlightStability:
                 logging.info("Beyond top of a descent.")
                 logging.info("Estimated descent parameters:")
                 logging.info(f"Current alt: {self.aq_alt.value}")
-                logging.info(f"Next waypont alt: {self.aq_next_wp_alt.value*3.28084}")
+                logging.info(f"Next waypoint alt: {self.aq_next_wp_alt.value*3.28084}")
+                logging.info(f"Altitude change needed: {self.target_altitude_change()}")
                 logging.info(f"Distance to next waypoint: {clearance.next} nm")
                 logging.info(f"Distance needed: {self.arrival_distance()/self.descent_safety_factor}")
                 logging.info(f"Glideslope {self.degrees_of_descent} degrees")

@@ -62,6 +62,8 @@ class FlightStability:
             # where ** is the exponentiation operator.
             #self.final_approach = int(self.config['stability']['final_approach']) # fpm
             self.degrees_of_descent = float(self.config['stability']['degrees_of_descent'])
+            self.angle_of_climb = float(self.config['stability']['angle_of_climb'])
+            self.decel_for_climb = self.config['stability'].getboolean('decel_for_climb')
             self.descent_safety_factor = float(self.config['stability']['descent_safety_factor'])
             self.pause_at_tod = config.getboolean('stability', 'pause_at_tod')
         
@@ -279,21 +281,20 @@ class FlightStability:
         ground_speed = self.aq_ground_speed.value * 5.4e-4
         return ground_speed
 
-    def target_descent_fpm(self):
+    def target_fpm(self, angle):
         # https://code7700.com/rot_descent_vvi.htm
         # Convert to nm/min
         ground_speed = self.ground_speed()*60
         # rough calculation. I have also seen (ground_speed(knots)/2)*10
         # TODO: Change this based on descent angle
-        return ground_speed * 6076.118 * sin(radians(self.degrees_of_descent))
+        return ground_speed * 6076.118 * sin(radians(angle))
 
-    def required_descent_fpm(self):
+    def required_fpm(self):
         # https://code7700.com/rot_descent_vvi.htm
         # Convert to nm/min
         ground_speed = self.ground_speed()*60
         # rough calculation. I have also seen (ground_speed(knots)/2)*10
-        # TODO: Change this based on descent angle
-        total_descent = abs(self.aq_alt.value - (self.aq_next_wp_alt.value*3.28084))
+        total_descent = (self.aq_next_wp_alt.value*3.28084) - self.aq_alt.value
         arrival_distance = self.get_waypoint_distances()[1]*6076.118
         fpm = 0
         try:
@@ -307,10 +308,14 @@ class FlightStability:
         # https://www.thinkaviation.net/top-of-descent-calculation/
         # Current alt is in feet. Waypoint alt is in meters.
         # Convert next waypoint to feet.
-        total_descent = abs(self.aq_alt.value - (self.aq_next_wp_alt.value*3.28084))
+        total_descent = self.aq_alt.value - (self.aq_next_wp_alt.value*3.28084)
         feet_to_nm = 6076.118
         # Solve the triangle to get a chosen degree of descent
-        distance = (total_descent/tan(radians(self.degrees_of_descent)))/feet_to_nm
+        if total_descent < 0:
+            angle = self.angle_of_climb
+        else:
+            angle = self.degrees_of_descent
+        distance = (total_descent/tan(radians(angle)))/feet_to_nm
         return distance*self.descent_safety_factor
 
     def distance_to_destination(self):
@@ -358,7 +363,11 @@ class FlightStability:
     def is_past_leg_descent(self):
         try:
             #distance_to_dest = self.get_waypoint_distances()[1]
-            if self.get_waypoint_distances().next < self.arrival_distance():
+            arrival_distance = self.arrival_distance()
+            if self.decel_for_climb:
+                # Arrival distance is negative for climbs
+                arrival_distance = abs(self.arrival_distance())
+            if self.get_waypoint_distances().next < arrival_distance:
                 return True
         except:
             pass
@@ -406,8 +415,9 @@ class FlightStability:
                 logging.info(f"Distance to next waypoint: {clearance.next} nm")
                 logging.info(f"Distance needed: {self.arrival_distance()/self.descent_safety_factor}")
                 logging.info(f"Glideslope {self.degrees_of_descent} degrees")
-                logging.info(f"3 degree FPM: -{self.target_descent_fpm()} fpm")
-                logging.info(f"Needed FPM: -{self.required_descent_fpm()} fpm")
+                logging.info(f"Needed FPM: {self.required_fpm()} fpm")
+                logging.info(f"Target FPM (descent): {self.target_fpm(self.degrees_of_descent)} fpm")
+                logging.info(f"Target FPM (climb): {self.target_fpm(self.angle_of_climb)} fpm")
                 approaching = True
 
             if last and too_low:
@@ -460,7 +470,7 @@ class FlightStability:
                         stable = 0
                     else:
                         stable = 1
-                    logging.info("Arrival imminent.")
+                    logging.info("Flight level change needed.")
                 elif self.are_angles_aggressive():
                     logging.info("Pitch or bank too high")
                     stable = 1

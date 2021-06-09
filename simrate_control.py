@@ -89,7 +89,7 @@ class FlightStability:
         self.aq_cur_waypoint_index = self.aq.find("GPS_FLIGHT_PLAN_WP_INDEX")
         self.aq_num_waypoints = self.aq.find("GPS_FLIGHT_PLAN_WP_COUNT")
         self.aq_agl = self.aq.find("PLANE_ALT_ABOVE_GROUND")
-        self.aq_alt = self.aq.find("PLANE_ALTITUDE")
+        self.aq_alt_indicated = self.aq.find("INDICATED_ALTITUDE")
         self.aq_nav_mode = self.aq.find("AUTOPILOT_NAV1_LOCK")
         self.aq_heading_hold = self.aq.find("AUTOPILOT_HEADING_LOCK")
         self.aq_approach_hold = self.aq.find("AUTOPILOT_APPROACH_HOLD")
@@ -287,11 +287,11 @@ class FlightStability:
         # If the next waypoint altitude is set to zero, try to approximate
         # setting the alt to the ground's altitude
         if abs(next_alt) < 10:
-            next_alt = self.aq_alt.value - self.aq_agl.value
+            next_alt = self.aq_alt_indicated.value - self.aq_agl.value
         return next_alt
 
     def target_altitude_change(self):
-        total_descent = self.next_waypoint_altitude() - self.aq_alt.value
+        total_descent = self.next_waypoint_altitude() - self.aq_alt_indicated.value
         if abs(total_descent) < self.altitude_change_tolerance:
             return 0
         return total_descent
@@ -422,7 +422,7 @@ class FlightStability:
                 (self.distance_to_destination() < self.destination_distance)):
                 logging.info("Beyond flight level change point.")
                 logging.info("Estimated parameters:")
-                logging.info(f"Current alt: {self.aq_alt.value}")
+                logging.info(f"Current alt: {self.aq_alt_indicated.value}")
                 logging.info(f"Next waypoint alt: {self.next_waypoint_altitude()}")
                 logging.info(f"Altitude change needed: {self.target_altitude_change()}")
                 logging.info(f"Distance to next waypoint: {clearance.next} nm")

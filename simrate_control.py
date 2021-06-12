@@ -3,7 +3,7 @@ import os, sys
 import configparser
 from time import sleep
 from collections import namedtuple
-from math import radians, degrees, ceil, tan, sin, asin
+from math import radians, degrees, ceil, tan, sin, asin, floor, log2
 
 import pyttsx3
 from SimConnect import *
@@ -528,7 +528,11 @@ class SimRateManager:
         else:
             self.config = config
             self.min_rate = int(self.config['simrate']['min_rate'])
-            self.max_rate = int(self.config['simrate']['max_rate'])
+            # If the user set something like "5" the simrate would go back and forth
+            # because the game only has rates of the form 2**x. This formula will always
+            # set the simrate to the valid simrate <= to the configured
+            # simrate. 2**(floor(log2(x)))
+            self.max_rate = int(2**floor(log2(int(self.config['simrate']['max_rate']))))
             self.annunciation = config.getboolean('simrate', 'annunciation')
         
         self.aq = AircraftRequests(self.sm)

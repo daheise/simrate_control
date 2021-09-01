@@ -17,7 +17,7 @@ class ScCurses:
 Sim Rate:                  Target Simrate:  
 AP Mode: 
 Pitch/Bank:     /          Max Pitch/Bank:     / 
-Alt:                       Min Alt: Unused
+Alt:                       Min Alt: 
 Waypoint:                  G. Speed: 
 Waypoint Dist:             FLC:          / 
 Waypoint Alt:              Target VS/Slope:         / 
@@ -75,7 +75,7 @@ Messages:
         self._screen.addstr(4, 5, f"{str(int(feet))}ft")
 
     def write_min_alt(self, feet):
-        self._screen.addstr(4, 18, f"{str(int(feet))}ft")
+        self._screen.addstr(4, 36, f"{str(int(feet))}ft")
 
     def write_waypoint_ident(self, ident):
         self._screen.addstr(5, 10, f"{str(ident)}")

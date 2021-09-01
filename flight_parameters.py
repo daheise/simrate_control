@@ -44,6 +44,7 @@ class FlightDataMetrics:
         self.aq_prev_wp_lon = self._get_value("GPS_WP_PREV_LON")
         self.aq_cur_lat = self._get_value("GPS_POSITION_LAT")
         self.aq_cur_long = self._get_value("GPS_POSITION_LON")
+        self.aq_next_wp_ident = self._get_value("GPS_WP_NEXT_ID").decode("utf-8")
         self.aq_next_wp_lat = self._get_value("GPS_WP_NEXT_LAT")
         self.aq_next_wp_lon = self._get_value("GPS_WP_NEXT_LON")
         self.aq_next_wp_alt = self._get_value("GPS_WP_NEXT_ALT")
@@ -60,10 +61,7 @@ class FlightDataMetrics:
         self.aq_heading_hold = self._get_value("AUTOPILOT_HEADING_LOCK")
         self.aq_approach_hold = self._get_value("AUTOPILOT_APPROACH_HOLD")
         self.aq_approach_active = self._get_value("GPS_IS_APPROACH_ACTIVE")
-        self.aq_destiantion_airport = self._get_value("GPS_APPROACH_AIRPORT_ID")
         self.aq_ete = self._get_value("GPS_ETE")
-        self.aq_decision_height = self._get_value("DECISION_HEIGHT")
-        self.aq_decision_alt = self._get_value("DECISION_ALTITUDE_MSL")
         # self.aq_nav_has_nav = [self._get_value("NAV_HAS_NAV:1"), self._get_value("NAV_HAS_NAV:2")]
         self.aq_has_localizer = [
             self._get_value("NAV_HAS_LOCALIZER:1"),

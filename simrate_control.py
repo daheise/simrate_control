@@ -144,6 +144,8 @@ def update_screen(
     sc_curses.write_bank(degrees(flight_data_parameters.aq_bank))
     sc_curses.write_pitch(degrees(flight_data_parameters.aq_pitch))
     sc_curses.write_ground_speed(flight_data_parameters.ground_speed() * 3600)
+    sc_curses.write_waypoint_ident(flight_data_parameters.aq_next_wp_ident)
+    sc_curses.write_min_alt(flight_data_parameters.aq_alt_indicated - flight_data_parameters.aq_agl + simrate_discriminator.min_agl_cruise)
     sc_curses.write_waypoint_distance(
         flight_data_parameters.get_waypoint_distances().next
     )

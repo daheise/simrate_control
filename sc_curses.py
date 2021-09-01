@@ -13,7 +13,7 @@ class ScCurses:
 
     def write_layout(self):
         # Clear screen
-        layout = """Simrate Control Simconnect Status: Unused
+        layout = """Simrate Control
 Sim Rate:                  Target Simrate:  
 AP Mode: 
 Pitch/Bank:     /          Max Pitch/Bank:     / 
@@ -48,7 +48,7 @@ Messages:
         self._screen.addstr(10, 22, f"{str(td)}")
 
     def write_simrate(self, rate: int) -> None:
-        self._screen.addstr(1, 10, f"{str(int(rate))}x")
+        self._screen.addstr(1, 10, f"{rate:.2f}x")
 
     def write_target_simrate(self, rate: int) -> None:
         self._screen.addstr(1, 43, f"{str(int(rate))}x")

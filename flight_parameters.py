@@ -3,6 +3,7 @@ from geopy import distance
 from collections import namedtuple
 from sys import maxsize
 from math import radians, degrees, ceil, tan, sin, asin, floor, log2
+from time import sleep
 
 
 class SimConnectDataError(Exception):
@@ -22,47 +23,58 @@ class FlightDataMetrics:
     def __del__(self):
         self.sm.exit()
 
-    def update(self):
+    def _get_value(self, aq_name, retries=maxsize):
+        val = self.aq.find(str(aq_name)).value
+        i = 0
+        while val is None and i < retries:
+            val = self.aq.find(str(aq_name)).value
+            i += 1
+            sleep(0.01)
+        if i > 0:
+            self.messages.append(f"Warning: Retried {aq_name} {i} times.")
+        return val
+
+    def update(self, retries=maxsize):
         # Load these all up for three reasons.
         # 1. These are static items
         # 2. Running them over and over may trigger a memory leak in the game
         # 3. It seems to increase reliability of reading/setting the data
         self.messages = []
-        self.aq_prev_wp_lat = self.aq.find("GPS_WP_PREV_LAT").value
-        self.aq_prev_wp_lon = self.aq.find("GPS_WP_PREV_LON").value
-        self.aq_cur_lat = self.aq.find("GPS_POSITION_LAT").value
-        self.aq_cur_long = self.aq.find("GPS_POSITION_LON").value
-        self.aq_next_wp_lat = self.aq.find("GPS_WP_NEXT_LAT").value
-        self.aq_next_wp_lon = self.aq.find("GPS_WP_NEXT_LON").value
-        self.aq_next_wp_alt = self.aq.find("GPS_WP_NEXT_ALT").value
-        self.aq_pitch = self.aq.find("PLANE_PITCH_DEGREES").value
-        self.aq_bank = self.aq.find("PLANE_BANK_DEGREES").value
-        self.aq_vsi = self.aq.find("VERTICAL_SPEED").value
-        self.aq_ap_master = self.aq.find("AUTOPILOT_MASTER").value
-        self.aq_is_prev_wp_valid = self.aq.find("GPS_WP_PREV_VALID").value
-        self.aq_cur_waypoint_index = self.aq.find("GPS_FLIGHT_PLAN_WP_INDEX").value
-        self.aq_num_waypoints = self.aq.find("GPS_FLIGHT_PLAN_WP_COUNT").value
-        self.aq_agl = self.aq.find("PLANE_ALT_ABOVE_GROUND").value
-        self.aq_alt_indicated = self.aq.find("INDICATED_ALTITUDE").value
-        self.aq_nav_mode = self.aq.find("AUTOPILOT_NAV1_LOCK").value
-        self.aq_heading_hold = self.aq.find("AUTOPILOT_HEADING_LOCK").value
-        self.aq_approach_hold = self.aq.find("AUTOPILOT_APPROACH_HOLD").value
-        self.aq_approach_active = self.aq.find("GPS_IS_APPROACH_ACTIVE").value
-        self.aq_destiantion_airport = self.aq.find("GPS_APPROACH_AIRPORT_ID").value
-        self.aq_ete = self.aq.find("GPS_ETE").value
-        self.aq_decision_height = self.aq.find("DECISION_HEIGHT").value
-        self.aq_decision_alt = self.aq.find("DECISION_ALTITUDE_MSL").value
-        # self.aq_nav_has_nav = [self.aq.find("NAV_HAS_NAV:1"), self.aq.find("NAV_HAS_NAV:2")]
+        self.aq_prev_wp_lat = self._get_value("GPS_WP_PREV_LAT")
+        self.aq_prev_wp_lon = self._get_value("GPS_WP_PREV_LON")
+        self.aq_cur_lat = self._get_value("GPS_POSITION_LAT")
+        self.aq_cur_long = self._get_value("GPS_POSITION_LON")
+        self.aq_next_wp_lat = self._get_value("GPS_WP_NEXT_LAT")
+        self.aq_next_wp_lon = self._get_value("GPS_WP_NEXT_LON")
+        self.aq_next_wp_alt = self._get_value("GPS_WP_NEXT_ALT")
+        self.aq_pitch = self._get_value("PLANE_PITCH_DEGREES")
+        self.aq_bank = self._get_value("PLANE_BANK_DEGREES")
+        self.aq_vsi = self._get_value("VERTICAL_SPEED")
+        self.aq_ap_master = self._get_value("AUTOPILOT_MASTER")
+        self.aq_is_prev_wp_valid = self._get_value("GPS_WP_PREV_VALID")
+        self.aq_cur_waypoint_index = self._get_value("GPS_FLIGHT_PLAN_WP_INDEX")
+        self.aq_num_waypoints = self._get_value("GPS_FLIGHT_PLAN_WP_COUNT")
+        self.aq_agl = self._get_value("PLANE_ALT_ABOVE_GROUND")
+        self.aq_alt_indicated = self._get_value("INDICATED_ALTITUDE")
+        self.aq_nav_mode = self._get_value("AUTOPILOT_NAV1_LOCK")
+        self.aq_heading_hold = self._get_value("AUTOPILOT_HEADING_LOCK")
+        self.aq_approach_hold = self._get_value("AUTOPILOT_APPROACH_HOLD")
+        self.aq_approach_active = self._get_value("GPS_IS_APPROACH_ACTIVE")
+        self.aq_destiantion_airport = self._get_value("GPS_APPROACH_AIRPORT_ID")
+        self.aq_ete = self._get_value("GPS_ETE")
+        self.aq_decision_height = self._get_value("DECISION_HEIGHT")
+        self.aq_decision_alt = self._get_value("DECISION_ALTITUDE_MSL")
+        # self.aq_nav_has_nav = [self._get_value("NAV_HAS_NAV:1"), self._get_value("NAV_HAS_NAV:2")]
         self.aq_has_localizer = [
-            self.aq.find("NAV_HAS_LOCALIZER:1").value,
-            self.aq.find("NAV_HAS_LOCALIZER:2").value,
+            self._get_value("NAV_HAS_LOCALIZER:1"),
+            self._get_value("NAV_HAS_LOCALIZER:2"),
         ]
         self.aq_has_glide_scope = [
-            self.aq.find("NAV_HAS_GLIDE_SLOPE:1").value,
-            self.aq.find("NAV_HAS_GLIDE_SLOPE:2").value,
+            self._get_value("NAV_HAS_GLIDE_SLOPE:1"),
+            self._get_value("NAV_HAS_GLIDE_SLOPE:2"),
         ]
-        self.aq_ground_speed = self.aq.find("GPS_GROUND_SPEED").value
-        self.aq_title = self.aq.find("TITLE").value
+        self.aq_ground_speed = self._get_value("GPS_GROUND_SPEED")
+        self.aq_title = self._get_value("TITLE")
 
     def next_waypoint_altitude(self):
         next_alt = self.aq_next_wp_alt * 3.28084
@@ -125,7 +137,7 @@ class FlightDataMetrics:
         fpm = 0
         try:
             fpm = ground_speed * asin(self.target_altitude_change() / waypoint_distance)
-        except ValueError:
+        except (ValueError, ZeroDivisionError):
             pass
         return fpm
 
@@ -373,7 +385,7 @@ class SimrateDiscriminator:
                 close = False
             else:
                 self.messages.append(
-                    f"Close ({previous_dist}, {next_dist}) to waypoint: ({clearance.prev} nm, {clearance.next} nm)"
+                    f"Close ({previous_dist:.2f}, {next_dist:.2f}) to waypoint: ({clearance.prev:.2f} nm, {clearance.next:.2f} nm)"
                 )
         except TypeError:
             raise SimConnectDataError()

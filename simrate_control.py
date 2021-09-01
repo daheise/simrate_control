@@ -5,12 +5,10 @@ from flight_parameters import (
     SimConnectDataError,
 )
 from SimConnect import *
-import logging
-import os, sys
+import sys, os
 import configparser
 from time import sleep
-from collections import namedtuple
-from math import radians, degrees, ceil, tan, sin, asin, floor, log2
+from math import degrees, floor, log2
 
 import pyttsx3
 
@@ -133,9 +131,6 @@ class SimRateManager:
             self.say_sim_rate()
         return messages
 
-    def __del__(self):
-        self.stop_acceleration()
-
 
 def update_screen(
     sc_curses: ScCurses,
@@ -193,6 +188,21 @@ def update_screen(
     sc_curses.update()
 
 
+def connect():
+    connected = False
+    sm = None
+    while not connected:
+        try:
+            sm = SimConnect()
+            connected = True
+        except KeyboardInterrupt:
+            quit()
+        except Exception as e:
+            # ui.write_message(type(e).__name__, e)
+            sleep(5)
+    return sm
+
+
 def main(stdscr):
     from sc_curses import ScCurses
 
@@ -230,8 +240,6 @@ def main(stdscr):
                 messages += srm.update(max_stable_rate)
             except TypeError as e:
                 messages.append(e)
-            except KeyboardInterrupt:
-                raise KeyboardInterrupt
             except SimConnectDataError:
                 messages.append("DATA ERROR: DECEL")
                 if config.getboolean("simrate", "decelerate_on_simconnect_error"):
@@ -240,19 +248,15 @@ def main(stdscr):
                 update_screen(ui, flight_data_metrics, flight_stability, srm, messages)
                 sleep(1)
     except KeyboardInterrupt:
-        pass
-    except OSError:
-        ui.write_message("Flight Simulator exited. Shutting down.")
-        sys.exit()
-    except Exception as e:
-        raise e
-    finally:
         srm.stop_acceleration()
         sleep(1)
         srm.say_sim_rate()
-        sm.exit()
+        del sm
         ui.update()
         sleep(5)
+        sys.exit(0)
+    except OSError as e:
+        raise e
     return 0
 
 
@@ -267,4 +271,9 @@ def curse(stdscr):
 if __name__ == "__main__":
     from curses import wrapper
 
-    wrapper(main)
+    try:
+        wrapper(main)
+    except OSError:
+        os.system("cls")
+        print("Flight Simulator exited. Shutting down.")
+        sys.exit()

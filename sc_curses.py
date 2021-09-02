@@ -8,6 +8,7 @@ from datetime import timedelta
 class ScCurses:
     def __init__(self, screen) -> None:
         self._screen = screen
+        self._screen.nodelay(True)
         self.write_layout()
         self._messages = []
 
@@ -38,7 +39,7 @@ Messages:
         self._screen.addstr(10, 5, f"{str(td)}")
 
     def write_ete_compressed(self, seconds, compression):
-        seconds = seconds // int(compression)
+        seconds = seconds // compression
         if seconds > 0:
             seconds = min(24 * 3600 - 1, seconds)
         else:
@@ -125,23 +126,27 @@ Messages:
             self._screen.addstr(i, 0, f"{eraser}")
             i += 1
 
-    def write_messages(self, messages: list):
+    def _write_messages_to_screen(self):
         i = 12
-        max_messages = 30 - i
-        _messages = messages[0:max_messages]
-        for m in _messages:
+        for m in self._messages:
             self._screen.addstr(i, 0, f"{m}")
             i += 1
-        if len(messages) > max_messages:
-            self._screen.addstr(i, 0, f"Additional messages truncated")
+
+    def write_messages(self, messages: list):
+        i = 12
+        max_messages = 30 - i -len(self._messages)
+        self._messages += messages[0:max_messages]
 
     def write_message(self, msg):
         self._messages.append(str(msg))
 
-    def update(self, flight_data=None):
-        self.write_messages(self._messages)
+    def update(self):
+        self._write_messages_to_screen()
+        k = self._screen.getch()
         self._messages = []
-        self._screen.refresh()
         self._screen.clear()
         self.write_layout()
-        return
+        if k == ord('q') or k == 3:
+            return False
+        else:
+            return True

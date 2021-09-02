@@ -20,16 +20,13 @@ class FlightDataMetrics:
         self.aq = AircraftRequests(self.sm)
         self.messages = []
 
-    def __del__(self):
-        self.sm.exit()
-
     def _get_value(self, aq_name, retries=maxsize):
         val = self.aq.find(str(aq_name)).value
         i = 0
         while val is None and i < retries:
+            sleep(min(1, 0.01*(i+1)))
             val = self.aq.find(str(aq_name)).value
             i += 1
-            sleep(0.01)
         if i > 0:
             self.messages.append(f"Warning: Retried {aq_name} {i} times.")
         return val
@@ -281,7 +278,7 @@ class SimrateDiscriminator:
             bank = abs(degrees(self.flight_params.aq_bank))
             if pitch > self.max_pitch or bank > self.max_bank:
                 self.messages.append(
-                    f"Agressive angles detected: {pitch} deg {bank} deg"
+                    f"Agressive angles detected: {int(pitch)} deg {int(bank)} deg"
                 )
                 agressive = True
             else:

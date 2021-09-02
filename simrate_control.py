@@ -49,15 +49,24 @@ class SimRateManager:
         self.aq = AircraftRequests(self.sm)
         self.ae = AircraftEvents(self.sm)
 
-        self.sc_sim_rate = self.aq.find("SIMULATION_RATE")
         self.increase_sim_rate = self.ae.find("SIM_RATE_INCR")
         self.decrease_sim_rate = self.ae.find("SIM_RATE_DECR")
         self.ae_pause = self.ae.find("PAUSE_ON")
         self.tts_engine = pyttsx3.init()
 
+    def _get_value(self, aq_name, retries=sys.maxsize):
+        val = self.aq.find(str(aq_name)).value
+        i = 0
+        while val is None and i < retries:
+            sleep(min(1, 0.01*(i+1)))
+            val = self.aq.find(str(aq_name)).value
+            i += 1
+        return val
+
     def get_sim_rate(self):
         """Get the current sim rate."""
-        return self.sc_sim_rate.value
+
+        return self._get_value("SIMULATION_RATE")
 
     def say_sim_rate(self):
         """Speak the current sim rate using text-to-speech"""
@@ -125,14 +134,14 @@ class SimRateManager:
         elif max_stable_rate < prev_simrate:
             messages.append("decelerate")
             self.decelerate()
-        sleep(0.1)
+        sleep(0.5)
         new_simrate = self.get_sim_rate()
         if prev_simrate != new_simrate:
             self.say_sim_rate()
         return messages
 
 
-def update_screen(
+def write_screen(
     sc_curses: ScCurses,
     flight_data_parameters: FlightDataMetrics,
     simrate_discriminator: SimrateDiscriminator,
@@ -187,13 +196,13 @@ def update_screen(
         flight_data_parameters.aq_ete, simrate_manager.get_sim_rate()
     )
     sc_curses.write_messages(messages)
-    sc_curses.update()
 
-
-def connect():
+def connect(retries = 999):
     connected = False
     sm = None
-    while not connected:
+    i = 0
+    while not connected and i <= retries:
+        i += 1
         try:
             sm = SimConnect()
             connected = True
@@ -204,61 +213,55 @@ def connect():
             sleep(5)
     return sm
 
-
 def main(stdscr):
     from sc_curses import ScCurses
 
+    stdscr.nodelay(True)
     ui = ScCurses(stdscr)
     config = configparser.ConfigParser()
     config.read("config.ini")
-
-    connected = False
-    while not connected:
-        ui.update()
-        try:
-            sm = SimConnect()
-            connected = True
+    sm = None
+    ui.write_message("Not connected...")
+    srm = None
+    while ui.update():
+        messages = []
+        if sm is None:
+            ui.write_message("Not connected...")
+            sm = connect(0)
+            flight_data_metrics = FlightDataMetrics(sm)
+            srm = SimRateManager(sm, config)
+            flight_stability = SimrateDiscriminator(flight_data_metrics, config)
+        else:
             ui.write_message("Connected to simulator.")
-        except KeyboardInterrupt:
-            quit()
-        except Exception as e:
-            # ui.write_message(type(e).__name__, e)
-            ui.write_message("Connection failed, retrying...")
-            ui.update()
-            sleep(5)
 
-    flight_data_metrics = FlightDataMetrics(sm)
-    srm = SimRateManager(sm, config)
-    flight_stability = SimrateDiscriminator(flight_data_metrics, config)
-    messages = []
-    try:
-        have_paused_at_tod = False
-        while True:
-
+        if sm is not None:
             try:
                 flight_data_metrics.update()
                 max_stable_rate = flight_stability.get_max_sim_rate()
-                messages = flight_stability.get_messages()
+                messages += flight_stability.get_messages()
                 messages += srm.update(max_stable_rate)
+                write_screen(ui, flight_data_metrics, flight_stability, srm, messages)
+                sleep(0.01)
             except TypeError as e:
                 messages.append(e)
             except SimConnectDataError:
                 messages.append("DATA ERROR: DECEL")
                 if config.getboolean("simrate", "decelerate_on_simconnect_error"):
                     srm.decelerate()
-            finally:
-                update_screen(ui, flight_data_metrics, flight_stability, srm, messages)
+            except KeyboardInterrupt:
+                srm.stop_acceleration()
                 sleep(1)
-    except KeyboardInterrupt:
+                srm.say_sim_rate()
+                sm = None
+                ui.update()
+                break      
+            except OSError as e:
+                ui.write_message(str(e))
+                sm = None
+    if srm is not None and sm is not None:
         srm.stop_acceleration()
         sleep(1)
         srm.say_sim_rate()
-        del sm
-        ui.update()
-        sleep(5)
-        sys.exit(0)
-    except OSError as e:
-        raise e
     return 0
 
 

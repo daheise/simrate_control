@@ -299,7 +299,7 @@ if __name__ == "__main__":
     from curses import wrapper
 
     try:
-        os.system('mode con: cols=65 lines=20')
+        os.system("mode con: cols=65 lines=20")
         wrapper(main)
     except OSError:
         os.system("cls")

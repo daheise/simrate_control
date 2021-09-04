@@ -31,7 +31,9 @@ class FlightDataMetrics:
         i = 0
         while val is None and i < retries:
             i += 1
-            self._request_sleep = min(self._request_sleep + 0.05 * i, self._max_request_sleep)
+            self._request_sleep = min(
+                self._request_sleep + 0.05 * i, self._max_request_sleep
+            )
             sleep(self._request_sleep)
             val = self.aq.find(str(aq_name)).value
         if i > 0:
@@ -72,7 +74,7 @@ class FlightDataMetrics:
         ident = self._get_value("GPS_WP_NEXT_ID").decode("utf-8")
         self.aq_next_wp_ident = (
             ident
-            if self.next_waypoint_altitude() > (self.get_ground_elevation() + 200)
+            if self.next_waypoint_altitude() > (self.get_ground_elevation() + 1000)
             else f"LAND ({ident})"
         )
 
@@ -85,7 +87,7 @@ class FlightDataMetrics:
         return next_alt
 
     def get_ground_elevation(self):
-        #return self.aq_alt_indicated - self.aq_agl
+        # return self.aq_alt_indicated - self.aq_agl
         return self.aq_ground_elevation * 3.28084
 
     def get_waypoint_distances(self):
@@ -104,7 +106,7 @@ class FlightDataMetrics:
             next_clearance = distance.distance(
                 (next_wp_lat, next_wp_lon), (cur_lat, cur_long)
             ).nm
-            if self.next_waypoint_altitude() <= (self.get_ground_elevation() + 200):
+            if self.next_waypoint_altitude() <= (self.get_ground_elevation() + 1000):
                 return WaypointClearance(
                     prev_clearance, self.ground_speed() * self.aq_ete
                 )

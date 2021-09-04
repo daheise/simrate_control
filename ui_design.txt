@@ -1,0 +1,30 @@
+Simrate Control
+Sim Rate: 16x              Simconnect Status: Disconnected
+AP Mode: On/GPS
+Pitch/Bank: 90° / 90°      Max Pitch/Bank: 90° / 90°
+Alt: 999999ft              Min Alt: 999999ft
+Waypoint: 123456           G. Speed: 9,999kts
+Waypoint Dist: 20,000nm    TOD: HH:MM:SS / -20,000nm 
+Waypoint Alt: 999,999ft    Target VS/Slope: -9,999fpm / 90°
+VS: -9,999fpm              Needed VS: -9,999fpm
+AGL: 999999ft              Min AGL: 999999ft
+Messages:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SCREEN SIZE (30, 80)

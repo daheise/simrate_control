@@ -1,17 +1,22 @@
-![Simrate_control_stable](https://user-images.githubusercontent.com/5230957/98481107-f5244180-21c5-11eb-93b1-656d278f23da.PNG)
+![Simrate_control_stable](https://user-images.githubusercontent.com/5230957/132078269-3588d11b-978a-4110-85bc-a634f18469c8.PNG)
 
 ## SimRate Control Theory of Operations
 
-This script is intended to give stable time compression while following a flight
-plan on autopilot. At the moment the controller checks the following parameters
-before accelerating. Violations will generally lead to sim rate being set to 1x,
-with the exception of simply being close to a waypoint, which will only reduce
-to 2x.
+This project is increases the sim rate while following a flight plan on
+autopilot. At the moment the controller checks the parameters below before
+accelerating. Violations will generally lead to sim rate being set to 1x,
+although some conditions will only reduce to 2x, e.g. being close to a waypoint,
+gentle ascents/descents.
 
-Simrate Control assumes you are following a well configured flight plan. It
+The window provides a number of data outputs that may be useful for acheiving
+maximum acceleration. It also has the convience feature up updating your
+barometer setting at every simrate change. The UI is unstable at this time, both
+in content and location of information.
+
+Simrate Control assumes you are following a well configured GPS flight plan. It
 uses waypoint altitudes to determine some sim rate conditions.
 
-Specific cited values for conditions detection are subject to change. Most have
+Specific cited values for condition detection are subject to change. Most have
 configuration options in the `config.ini`.
 
 **Sim Rate**
@@ -19,25 +24,17 @@ configuration options in the `config.ini`.
 Maximum simrate is 4x. Beyond 4x and flight become unstable by the other metrics
 and things just waffle back and forth.
 
-[Screenshot](https://user-images.githubusercontent.com/5230957/98481107-f5244180-21c5-11eb-93b1-656d278f23da.PNG)
-
 **Flight Plan**
 
 A flight plan must be loaded into the autopilot.
-
-[Screenshot](https://user-images.githubusercontent.com/5230957/98481104-f5244180-21c5-11eb-8a26-9f6282638572.PNG)
 
 **Autopilot Settings**
 
 Autopilot must be turned on and in lateral navigation ([L]NAV) mode.
 
-[Screenshot](https://user-images.githubusercontent.com/5230957/98481102-f48bab00-21c5-11eb-946e-7a2e3a5653b7.PNG)
-
 **Altitude**
 
 Acceleration will only function 1000ft AGL or higher.
-
-[Screenshot](https://user-images.githubusercontent.com/5230957/98481101-f48bab00-21c5-11eb-8dca-61c6f891aeb9.PNG)
 
 **Waypoint Proximity**
 
@@ -46,24 +43,18 @@ based on ground speed, the acceleration will reduce to 2x. This allows for time
 acceleration through a waypoint that does not involve a turn, but will minimize
 instability cause by the delay between the start of a turn and detection.
 
-[Screenshot](https://user-images.githubusercontent.com/5230957/98481111-f6556e80-21c5-11eb-8479-bd854d0e857b.PNG)
-
 **Pitch and Bank**
 
 Pitch and bank must have minimal deviations from straight and level.
 
-[Screenshot](https://user-images.githubusercontent.com/5230957/98481106-f5244180-21c5-11eb-96d6-f6f3647a2cbf.PNG)
-
 **Flight Level Change and Approach**
 
-If the next waypoint altitude is lower than the plane, then the plane must
-be far enough away/at an altitude that would allow the plane to execute a
-configured glidescope descent. Conversely, if the next waypoint is a higher
-altitude than the plane, then the plane must be far enough away/at an altitude
-that would allow the plane to execute a configued angle of ascent. There is
-also a configurable additional distance before these conditions would occur
-to allow you to set up your autopilot for ascent/descent. Ascent detection can
-be turned off.
+If the next waypoint altitude is lower than the plane, then the plane must be
+far enough away (measured in time) and at a vertical speed that would allow the
+plane to execute a configured glidescope descent and meet the target altitude.
+This functions similarly for ascent. There is also a configurable additional
+time before these conditions would occur to allow you to set up your autopilot
+for ascent/descent. Ascent detection can be turned off.
 
 The plane must be far enough away from the a destination. An approach is
 detected based on a few conditions. User should still be mindful of the
@@ -115,18 +106,17 @@ pyinstaller .\simrate_control.spec
 * Any addon aircraft that does not provide the simvars used to detect
   acceleration parmeters (e.g. Working Title CJ4) will not accelerate or will
   behave in unexpected ways.
-* ATC will tell you to fly at altitudes not in your flight plan. If you
-  follow ATC, then flight level change detection may reduce your simrate.
-* The in game flight planner will sometimes give you routes with slightly
-  lower or higher altitude waypoints interspersed during cruise. The will
-  trigger flight level change detection.
-* Approach waypoints are all set to 0ft. Therefore, the flight level change
-  detector will try to make room for you to get to the ground at every
-  waypoint. This leads to some rubber banding when using approaches. There is a
-  heuristic that uses plane AGL instead of 0ft MSL to reduce this effect
-  somewhat.
+* ATC will tell you to fly at altitudes not in your flight plan. If you follow
+  ATC, then flight level change detection may reduce your simrate.
+* The in game flight planner will sometimes give you routes with slightly lower
+  or higher altitude waypoints interspersed during cruise. The will trigger
+  flight level change detection.
+* At every simrate change the heading bug is selected for +/- operations. This
+  was done to prevent accidentally setting extreme simrate when using +/- during
+  a simrate transition. Selecting the heading bug is the least problematic
+  selection I could come up with that would get the sim off of simrate.
 
-Tested on: MSFS 2020 1.16.2.0
+Tested on: MSFS 2020 1.18.15.0
 
 ### Acknowledgements
 

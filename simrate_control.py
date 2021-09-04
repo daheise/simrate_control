@@ -237,8 +237,8 @@ def main(stdscr):
     ui = ScCurses(stdscr)
     config = configparser.ConfigParser()
     config.read("config.ini")
-    sm = None
     ui.write_message("Not connected...")
+    sm = None
     srm = None
     flight_data_metrics = None
     flight_stability = None
@@ -246,20 +246,19 @@ def main(stdscr):
         messages = []
         if sm is None:
             ui.write_message("Not connected...")
-            sm = connect(0)
             flight_data_metrics = None
             srm = None
             flight_stability = None
+            sm = connect(0)
         else:
             if flight_data_metrics is None:
                 flight_data_metrics = FlightDataMetrics(sm)
+                flight_stability = SimrateDiscriminator(flight_data_metrics, config)
             if srm is None:
                 srm = SimRateManager(sm, config)
-            if flight_stability is None:
-                flight_stability = SimrateDiscriminator(flight_data_metrics, config)
             ui.write_message("Connected to simulator.")
 
-        if sm is not None and srm is not None and flight_stability is not None:
+        if sm is not None and srm is not None:
             try:
                 flight_data_metrics.update()
                 max_stable_rate = flight_stability.get_max_sim_rate()
@@ -276,7 +275,6 @@ def main(stdscr):
                 srm.stop_acceleration()
                 sleep(1)
                 srm.say_sim_rate()
-                sm = None
                 ui.update()
                 break
             except OSError as e:
@@ -301,6 +299,7 @@ if __name__ == "__main__":
     from curses import wrapper
 
     try:
+        os.system('mode con: cols=65 lines=20')
         wrapper(main)
     except OSError:
         os.system("cls")

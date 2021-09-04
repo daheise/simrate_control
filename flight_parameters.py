@@ -20,7 +20,7 @@ class FlightDataMetrics:
         self.aq = AircraftRequests(self.sm)
         self.messages = []
         self._request_sleep = 0.05
-        self._max_request_sleep = 1
+        self._max_request_sleep = 0.5
         self._min_request_sleep = 0.01
         self.update()
 
@@ -31,8 +31,8 @@ class FlightDataMetrics:
         i = 0
         while val is None and i < retries:
             i += 1
-            self._request_sleep += 0.05 * i
-            sleep(min(self._max_request_sleep, self._request_sleep))
+            self._request_sleep = min(self._request_sleep + 0.05 * i, self._max_request_sleep)
+            sleep(self._request_sleep)
             val = self.aq.find(str(aq_name)).value
         if i > 0:
             self.messages.append(f"Warning: Retried {aq_name} {i} times.")

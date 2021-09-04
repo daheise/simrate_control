@@ -51,21 +51,28 @@ class SimRateManager:
 
         self.increase_sim_rate = self.ae.find("SIM_RATE_INCR")
         self.decrease_sim_rate = self.ae.find("SIM_RATE_DECR")
+        # The most innocuous "SELECT" event I can find at the moment to prevent
+        # wild simrrate selections while adjusting something (e.g. altitude bug)
+        # during a transition.
+        # TODO: Figure out something better.
+        self.heading_select_bug = self.ae.find("HEADING_BUG_SELECT")
+        self.set_barometer = self.ae.find("BAROMETRIC")
         self.ae_pause = self.ae.find("PAUSE_ON")
         self.tts_engine = pyttsx3.init()
 
     def _get_value(self, aq_name, retries=sys.maxsize):
+        # PySimConnect seems to crash the sim if requests happen too fast.
+        sleep(0.05)
         val = self.aq.find(str(aq_name)).value
         i = 0
         while val is None and i < retries:
-            sleep(min(1, 0.01*(i+1)))
+            sleep(min(1, 0.01 * (i + 1)))
             val = self.aq.find(str(aq_name)).value
             i += 1
         return val
 
     def get_sim_rate(self):
         """Get the current sim rate."""
-
         return self._get_value("SIMULATION_RATE")
 
     def say_sim_rate(self):
@@ -107,8 +114,12 @@ class SimRateManager:
             return
         if simrate > self.min_rate:
             self.decrease_sim_rate()
+            self.set_barometer()
+            self.heading_select_bug()
         elif simrate < self.min_rate:
             self.increase_sim_rate()
+            self.set_barometer()
+            self.heading_select_bug()
 
     def accelerate(self):
         """Increase the sim rate, up to some maximum"""
@@ -117,8 +128,12 @@ class SimRateManager:
             return
         if simrate < self.max_rate:
             self.increase_sim_rate()
+            self.set_barometer()
+            self.heading_select_bug()
         elif simrate > self.max_rate:
             self.decrease_sim_rate()
+            self.set_barometer()
+            self.heading_select_bug()
 
     def update(self, max_stable_rate):
         messages = []
@@ -154,7 +169,11 @@ def write_screen(
     sc_curses.write_pitch(degrees(flight_data_parameters.aq_pitch))
     sc_curses.write_ground_speed(flight_data_parameters.ground_speed() * 3600)
     sc_curses.write_waypoint_ident(flight_data_parameters.aq_next_wp_ident)
-    sc_curses.write_min_alt(flight_data_parameters.aq_alt_indicated - flight_data_parameters.aq_agl + simrate_discriminator.min_agl_cruise)
+    sc_curses.write_min_alt(
+        flight_data_parameters.aq_alt_indicated
+        - flight_data_parameters.aq_agl
+        + simrate_discriminator.min_agl_cruise
+    )
     sc_curses.write_waypoint_distance(
         flight_data_parameters.get_waypoint_distances().next
     )
@@ -197,7 +216,8 @@ def write_screen(
     )
     sc_curses.write_messages(messages)
 
-def connect(retries = 999):
+
+def connect(retries=999):
     connected = False
     sm = None
     i = 0
@@ -210,8 +230,9 @@ def connect(retries = 999):
             quit()
         except Exception as e:
             # ui.write_message(type(e).__name__, e)
-            sleep(5)
+            sleep(1)
     return sm
+
 
 def main(stdscr):
     from sc_curses import ScCurses
@@ -223,18 +244,26 @@ def main(stdscr):
     sm = None
     ui.write_message("Not connected...")
     srm = None
+    flight_data_metrics = None
+    flight_stability = None
     while ui.update():
         messages = []
         if sm is None:
             ui.write_message("Not connected...")
             sm = connect(0)
-            flight_data_metrics = FlightDataMetrics(sm)
-            srm = SimRateManager(sm, config)
-            flight_stability = SimrateDiscriminator(flight_data_metrics, config)
+            flight_data_metrics = None
+            srm = None
+            flight_stability = None
         else:
+            if flight_data_metrics is None:
+                flight_data_metrics = FlightDataMetrics(sm)
+            if srm is None:
+                srm = SimRateManager(sm, config)
+            if flight_stability is None:
+                flight_stability = SimrateDiscriminator(flight_data_metrics, config)
             ui.write_message("Connected to simulator.")
 
-        if sm is not None:
+        if sm is not None and srm is not None and flight_stability is not None:
             try:
                 flight_data_metrics.update()
                 max_stable_rate = flight_stability.get_max_sim_rate()
@@ -242,10 +271,9 @@ def main(stdscr):
                 messages += srm.update(max_stable_rate)
                 write_screen(ui, flight_data_metrics, flight_stability, srm, messages)
                 sleep(0.01)
-            except TypeError as e:
-                messages.append(e)
-            except SimConnectDataError:
-                messages.append("DATA ERROR: DECEL")
+            except (SimConnectDataError, AttributeError, TypeError) as e:
+                messages.append("DATA ERROR")
+                messages.append(str(e))
                 if config.getboolean("simrate", "decelerate_on_simconnect_error"):
                     srm.decelerate()
             except KeyboardInterrupt:
@@ -254,7 +282,7 @@ def main(stdscr):
                 srm.say_sim_rate()
                 sm = None
                 ui.update()
-                break      
+                break
             except OSError as e:
                 ui.write_message(str(e))
                 sm = None

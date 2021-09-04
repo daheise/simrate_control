@@ -19,16 +19,24 @@ class FlightDataMetrics:
         self.sm = simconnect_connection
         self.aq = AircraftRequests(self.sm)
         self.messages = []
+        self._request_sleep = 0.05
+        self._max_request_sleep = 1
+        self._min_request_sleep = 0.01
+        self.update()
 
     def _get_value(self, aq_name, retries=maxsize):
+        # PySimConnect seems to crash the sim if requests happen too fast.
+        sleep(self._request_sleep)
         val = self.aq.find(str(aq_name)).value
         i = 0
         while val is None and i < retries:
-            sleep(min(1, 0.01*(i+1)))
-            val = self.aq.find(str(aq_name)).value
             i += 1
+            self._request_sleep += 0.05 * i
+            sleep(min(self._max_request_sleep, self._request_sleep))
+            val = self.aq.find(str(aq_name)).value
         if i > 0:
             self.messages.append(f"Warning: Retried {aq_name} {i} times.")
+        self._request_sleep = max(self._min_request_sleep, self._request_sleep - 0.01)
         return val
 
     def update(self, retries=maxsize):
@@ -41,7 +49,6 @@ class FlightDataMetrics:
         self.aq_prev_wp_lon = self._get_value("GPS_WP_PREV_LON")
         self.aq_cur_lat = self._get_value("GPS_POSITION_LAT")
         self.aq_cur_long = self._get_value("GPS_POSITION_LON")
-        self.aq_next_wp_ident = self._get_value("GPS_WP_NEXT_ID").decode("utf-8")
         self.aq_next_wp_lat = self._get_value("GPS_WP_NEXT_LAT")
         self.aq_next_wp_lon = self._get_value("GPS_WP_NEXT_LON")
         self.aq_next_wp_alt = self._get_value("GPS_WP_NEXT_ALT")
@@ -59,25 +66,27 @@ class FlightDataMetrics:
         self.aq_approach_hold = self._get_value("AUTOPILOT_APPROACH_HOLD")
         self.aq_approach_active = self._get_value("GPS_IS_APPROACH_ACTIVE")
         self.aq_ete = self._get_value("GPS_ETE")
-        # self.aq_nav_has_nav = [self._get_value("NAV_HAS_NAV:1"), self._get_value("NAV_HAS_NAV:2")]
-        self.aq_has_localizer = [
-            self._get_value("NAV_HAS_LOCALIZER:1"),
-            self._get_value("NAV_HAS_LOCALIZER:2"),
-        ]
-        self.aq_has_glide_scope = [
-            self._get_value("NAV_HAS_GLIDE_SLOPE:1"),
-            self._get_value("NAV_HAS_GLIDE_SLOPE:2"),
-        ]
         self.aq_ground_speed = self._get_value("GPS_GROUND_SPEED")
+        self.aq_ground_elevation = self._get_value("GROUND_ALTITUDE")
         self.aq_title = self._get_value("TITLE")
+        ident = self._get_value("GPS_WP_NEXT_ID").decode("utf-8")
+        self.aq_next_wp_ident = (
+            ident
+            if self.next_waypoint_altitude() > (self.get_ground_elevation() + 200)
+            else f"LAND ({ident})"
+        )
 
     def next_waypoint_altitude(self):
         next_alt = self.aq_next_wp_alt * 3.28084
         # If the next waypoint altitude is set to zero, try to approximate
-        # setting the alt to the ground's altitude + 3000
+        # setting the alt to the ground's
         if abs(next_alt) < 10:
-            next_alt = self.aq_alt_indicated - self.aq_agl
+            next_alt = self.get_ground_elevation()
         return next_alt
+
+    def get_ground_elevation(self):
+        #return self.aq_alt_indicated - self.aq_agl
+        return self.aq_ground_elevation * 3.28084
 
     def get_waypoint_distances(self):
         """Get the distance to the previous and next FPL waypoints."""
@@ -95,8 +104,12 @@ class FlightDataMetrics:
             next_clearance = distance.distance(
                 (next_wp_lat, next_wp_lon), (cur_lat, cur_long)
             ).nm
-
-            return WaypointClearance(prev_clearance, next_clearance)
+            if self.next_waypoint_altitude() <= (self.get_ground_elevation() + 200):
+                return WaypointClearance(
+                    prev_clearance, self.ground_speed() * self.aq_ete
+                )
+            else:
+                return WaypointClearance(prev_clearance, next_clearance)
         except ValueError:
             raise SimConnectDataError()
         except TypeError:
@@ -108,9 +121,7 @@ class FlightDataMetrics:
         return ground_speed
 
     def target_altitude_change(self, altitude_change_tolerance=100, minimum_agl=0):
-        total_descent = (
-            max(self.next_waypoint_altitude(), minimum_agl) - self.aq_alt_indicated
-        )
+        total_descent = self.next_waypoint_altitude() - self.aq_alt_indicated
         if abs(total_descent) < altitude_change_tolerance:
             return 0
         return total_descent
@@ -139,6 +150,7 @@ class FlightDataMetrics:
     def distance_to_flc(self, angle):
         if self.target_altitude_change() == 0:
             return self.get_waypoint_distances().next
+
         return self.get_waypoint_distances().next - self.flc_length(angle)
 
     def time_to_flc(self, angle):
@@ -420,18 +432,29 @@ class SimrateDiscriminator:
             self.angle_of_climb, self.degrees_of_descent
         )
         try:
+            # Allow acceleration if the VSI is better than the required.
+            if (
+                self.flight_params.target_altitude_change() > 0
+                and self.flight_params.aq_vsi >= self.flight_params.required_fpm()
+            ) or (
+                self.flight_params.target_altitude_change() < 0
+                and self.flight_params.aq_vsi <= self.flight_params.required_fpm()
+            ):
+                return False
+
             if (
                 not self.decel_for_climb
                 and self.flight_params.target_altitude_change() > 0
             ):
                 return False
+
             if (
                 self.flight_params.time_to_flc(angle) < self.descent_safety_factor
                 and self.flight_params.target_altitude_change() != 0
             ):
                 return True
         except Exception as e:
-            pass
+            return True
         return False
 
     def is_approaching(self):
@@ -458,13 +481,7 @@ class SimrateDiscriminator:
                 too_low = False
             autopilot_active = bool(self.flight_params.aq_ap_master)
             approach_hold = bool(self.flight_params.aq_approach_hold)
-            # approach_active = bool(self.aq_approach_active.value)
 
-            # has_localizer = [int(l.value) for l in self.aq_has_localizer]
-            # has_glide_scope = [int(l.value) for l in self.aq_has_glide_scope]
-            # print(approach_active, has_localizer, has_glide_scope)
-            # min_distance = max(self.distance_to_flc(), self.destination_distance)
-            # if (((last or approach_active) and self.is_past_tod()) or
             if self.is_past_leg_flc():
                 self.messages.append("Prepare for FLC.")
                 approaching = True
@@ -472,15 +489,6 @@ class SimrateDiscriminator:
             if last and too_low:
                 self.messages.append(f"Last waypoint and low")
                 approaching = True
-
-            # seconds = ceil(self.get_approach_minutes(descent_fpm, performance_exponent,
-            # minimum_time))*60
-
-            #            if approach_active and self.is_past_tod():
-            # logging.info("Plane is descending slow while on approach.")
-            # logging.info(f"Target {self.degrees_of_descent} degree FPM: -{self.target_descent_fpm()} fpm")
-            # logging.info(f"Current Rate: {self.aq_vsi.value} fpm")
-            # approaching = True
 
             seconds = self.min_approach_time * 60
             if self.flight_params.aq_ete < seconds:
@@ -490,11 +498,6 @@ class SimrateDiscriminator:
             if autopilot_active and approach_hold:
                 self.messages.append("Approach hold mode on")
                 approaching = True
-
-            # if(has_localizer[0] or has_localizer[1] or
-            #    has_glide_scope[0] or has_glide_scope[1]):
-            #    logging.info("Localizer or glide scope detected")
-            #    approaching = True
 
         except TypeError:
             raise SimConnectDataError()
@@ -532,7 +535,7 @@ class SimrateDiscriminator:
                     self.messages.append("Vertical speed too high.")
                     stable = 2
                 elif self.is_waypoint_close():
-                    # The AP will switch waypoints several miles away to cut corners,
+                    # The AP will switch waypoints several seconds away to cut corners,
                     # so we slow down far enough away that we don't enter a turn prior
                     # to slowing down (4nm). To keep from speeding up immediately when
                     # a corner is cut we also give until 2.5nm after the switch

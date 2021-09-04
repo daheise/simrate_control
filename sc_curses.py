@@ -14,7 +14,7 @@ class ScCurses:
 
     def write_layout(self):
         # Clear screen
-        layout = """Simrate Control
+        layout = """Get-there-itis Simrate Control
 Sim Rate:                  Target Simrate:  
 AP Mode: 
 Pitch/Bank:     /          Max Pitch/Bank:     / 
@@ -128,14 +128,15 @@ Messages:
 
     def _write_messages_to_screen(self):
         i = 12
-        for m in self._messages:
+        max_messages = curses.LINES - 1 - i
+        for m in self._messages[0:max_messages]:
             self._screen.addstr(i, 0, f"{m}")
             i += 1
+        if len(self._messages) > max_messages:
+            self._screen.addstr(i, 0, "Additional messages truncated.")
 
     def write_messages(self, messages: list):
-        i = 12
-        max_messages = 30 - i -len(self._messages)
-        self._messages += messages[0:max_messages]
+        self._messages += messages
 
     def write_message(self, msg):
         self._messages.append(str(msg))
@@ -146,7 +147,7 @@ Messages:
         self._messages = []
         self._screen.clear()
         self.write_layout()
-        if k == ord('q') or k == 3:
+        if k == ord("q") or k == 3:
             return False
         else:
             return True

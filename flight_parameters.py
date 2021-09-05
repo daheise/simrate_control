@@ -70,7 +70,7 @@ class FlightDataMetrics:
         self.aq_ete = self._get_value("GPS_ETE")
         self.aq_ground_speed = self._get_value("GPS_GROUND_SPEED")
         self.aq_ground_elevation = self._get_value("GROUND_ALTITUDE")
-        self.aq_title = self._get_value("TITLE")
+
         ident = self._get_value("GPS_WP_NEXT_ID").decode("utf-8")
         self.aq_next_wp_ident = (
             ident
@@ -276,7 +276,8 @@ class SimrateDiscriminator:
             self.altitude_change_tolerance = int(
                 self.config["stability"]["altitude_change_tolerance"]
             )
-            self.pause_at_tod = config.getboolean("stability", "pause_at_tod")
+            self.ap_nav_guarded = self.config.getboolean("stability", "nav_mode_guarded")
+            self.pause_at_tod = self.config.getboolean("stability", "pause_at_tod")
 
         self.have_paused_at_tod = False
 
@@ -330,17 +331,16 @@ class SimrateDiscriminator:
         """
         ap_active = False
         try:
-            sc_autopilot_active = int(self.flight_params.aq_ap_master)
+            sc_autopilot_active = bool(self.flight_params.aq_ap_master)
             sc_nav_mode = int(self.flight_params.aq_nav_mode)
-            sc_title = self.flight_params.aq_title
             if sc_autopilot_active and sc_nav_mode:
                 ap_active = True
-            elif "A320" in str(sc_title) and sc_autopilot_active:
-                # Workaround for A320 not reporting AUTOPILOT_NAV1_LOCK like
-                # other planes. A320 always reports
+            elif not self.ap_nav_guarded and sc_autopilot_active:
+                # Some planes do not report AUTOPILOT_NAV1_LOCK and give
                 # AUTOPILOT_HEADING_LOCK==True and
-                # AUTOPILOT_NAV1_LOCK==False leaving no way to set the
-                # autopilot to disable time acceleration.
+                # AUTOPILOT_NAV1_LOCK==False leaving no way for the user to
+                # set the autopilot (e.g. to heading mode) to disable time
+                # acceleration.
                 ap_active = True
             else:
                 ap_active = False

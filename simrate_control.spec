@@ -1,11 +1,18 @@
 # -*- mode: python ; coding: utf-8 -*-
+import sys
 
 block_cipher = None
 scripts= ['simrate_control.py']
 
+def find_file_by_name(name, paths):
+    for path in sys.path:
+        for root, dirs, files in os.walk(path):
+            if name in files:
+                return os.path.join(root, name)
+
 a = Analysis(['simrate_control.py'],
              pathex=[SPECPATH],
-             binaries=[(SPECPATH + "/env/Lib/site-packages/SimConnect/SimConnect.dll", './SimConnect/')],
+             binaries=[(find_file_by_name('SimConnect.dll', sys.path), './SimConnect/')],
              datas=[('config.ini', './')],
              hiddenimports=['pyttsx3.drivers','pyttsx3.drivers.sapi5'],
              hookspath=[],

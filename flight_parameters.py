@@ -155,14 +155,12 @@ class FlightDataMetrics:
         return fpm
 
     def distance_to_flc(self):
-        angle = self.choose_slope_angle()
         if self.target_altitude_change() == 0:
             return self.get_waypoint_distances().next
 
         return self.get_waypoint_distances().next - self.flc_length()
 
     def time_to_flc(self):
-        angle = self.choose_slope_angle()
         gspeed = self.ground_speed()
         if gspeed == 0:
             return 0
@@ -380,7 +378,6 @@ class SimrateDiscriminator:
         return True
 
     def is_past_leg_flc(self):
-        angle = self.flight_params.choose_slope_angle()
         try:
             # Allow acceleration if the VSI is better than the required.
             if (

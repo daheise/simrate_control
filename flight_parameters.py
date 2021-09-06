@@ -490,7 +490,7 @@ class SimrateDiscriminator:
                     stable = 2
                 else:
                     self.messages.append("Flight stable")
-                    stable = 16
+                    stable = self._config.max_rate
             else:
                 self.messages.append("No valid flight plan. Stability undefined.")
                 stable = 1

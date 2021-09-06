@@ -296,14 +296,9 @@ class SimrateDiscriminator:
                 ap_active = True
             else:
                 ap_active = False
-                self.messages.append("AP not active.")
 
         except TypeError:
             raise SimConnectDataError()
-        if ap_active:
-            self.messages.append("AP On")
-        else:
-            self.messages.append("AP Off")
         return ap_active
 
     def is_waypoints_valid(self):
@@ -466,7 +461,6 @@ class SimrateDiscriminator:
         try:
             if self.is_waypoints_valid():
                 if not self.is_ap_active():
-                    self.messages.append("Autopilot not enabled.")
                     stable = 1
                 elif self.is_approaching():
                     if self._config.pause_at_tod and not self.have_paused_at_tod:

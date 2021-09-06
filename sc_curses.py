@@ -58,7 +58,8 @@ Messages:
         self._screen.addstr(11, 46, f"{str(status)}")
 
     def write_ap_mode(self, mode: str) -> None:
-        self._screen.addstr(2, 9, str(mode).ljust(3))
+        msg = "On" if mode else "Off"
+        self._screen.addstr(2, 9, str(msg).ljust(3))
 
     def write_pitch(self, angle) -> None:
         self._screen.addstr(3, 13, f"{str(int(angle))}°")

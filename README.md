@@ -96,25 +96,24 @@ pip install -r requirements.txt
 pyinstaller .\simrate_control.spec
 ```
 
-## TODO/Known Issues
+## Known Issues
 
-* The A320 does not report GPS_NAV1_LOCK like the other aircraft. As a
-  work-around, if the AP is on then time acceleration is enabled.
-  [Issue #2](https://github.com/daheise/msfs_utils/issues/2)
-* I would like to give this a GUI, but that's not high on my priority list.
-  [Issue #3](https://github.com/daheise/msfs_utils/issues/3)
-* Any addon aircraft that does not provide the simvars used to detect
-  acceleration parmeters (e.g. Working Title CJ4) will not accelerate or will
-  behave in unexpected ways.
+* This utility is only tested extensively with default planes. Mods and third
+  party planes often do not have the simvars this utilty relies on, and may
+  behave in unexpected ways or not at all. For example, the FlyByWire A320NX
+  does not work at all, because it uses a multitude of custom simvars. The
+  Working Title mods can also cause inconsistent behavior due to issues with
+  flight plan synchronization.
+* Some planes do not report LNAV being on/off. See config.ini
+  `nav_mode_guarded`.
 * ATC will tell you to fly at altitudes not in your flight plan. If you follow
-  ATC, then flight level change detection may reduce your simrate.
-* The in game flight planner will sometimes give you routes with slightly lower
-  or higher altitude waypoints interspersed during cruise. The will trigger
-  flight level change detection.
+  ATC, then flight level change detection may reduce your simrate. See
+  config.ini `waypoint_minimum_agl` for a partial work-around.
 * At every simrate change the heading bug is selected for +/- operations. This
   was done to prevent accidentally setting extreme simrate when using +/- during
   a simrate transition. Selecting the heading bug is the least problematic
-  selection I could come up with that would get the sim off of simrate.
+  selection I could come up with that would get the active selection off of
+  simrate.
 
 Tested on: MSFS 2020 1.18.15.0
 

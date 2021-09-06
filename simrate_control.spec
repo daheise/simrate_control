@@ -12,7 +12,7 @@ def find_file_by_name(name, paths):
 
 a = Analysis(['simrate_control.py'],
              pathex=[SPECPATH],
-             binaries=[(find_file_by_name('SimConnect.dll', sys.path), './SimConnect/')],
+             binaries=[(find_file_by_name('SimConnect.dll', [SPECPATH] + sys.path), './SimConnect/')],
              datas=[('config.ini', './')],
              hiddenimports=['pyttsx3.drivers','pyttsx3.drivers.sapi5'],
              hookspath=[],
@@ -22,8 +22,10 @@ a = Analysis(['simrate_control.py'],
              win_private_assemblies=False,
              cipher=block_cipher,
              noarchive=False)
+
 pyz = PYZ(a.pure, a.zipped_data,
              cipher=block_cipher)
+
 exe = EXE(pyz,
           a.scripts,
           [],
@@ -34,6 +36,7 @@ exe = EXE(pyz,
           strip=False,
           upx=True,
           console=True )
+
 coll = COLLECT(exe,
                a.binaries,
                a.zipfiles,

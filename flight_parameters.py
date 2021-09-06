@@ -1,3 +1,4 @@
+from sc_config import SimrateControlConfig
 from SimConnect import *
 from geopy import distance
 from collections import namedtuple
@@ -15,8 +16,9 @@ WaypointClearance = namedtuple("WaypointClearances", "prev next")
 
 
 class FlightDataMetrics:
-    def __init__(self, simconnect_connection):
+    def __init__(self, simconnect_connection, config: SimrateControlConfig):
         self.sm = simconnect_connection
+        self._config = config
         self.aq = AircraftRequests(self.sm)
         self.messages = []
         self._request_sleep = 0.05
@@ -74,7 +76,8 @@ class FlightDataMetrics:
         ident = self._get_value("GPS_WP_NEXT_ID").decode("utf-8")
         self.aq_next_wp_ident = (
             ident
-            if self.next_waypoint_altitude() > (self.get_ground_elevation() + 1000)
+            if self.next_waypoint_altitude()
+            > (self.get_ground_elevation() + self._config.waypoint_minimum_agl)
             else f"LAND ({ident})"
         )
 
@@ -82,7 +85,7 @@ class FlightDataMetrics:
         next_alt = self.aq_next_wp_alt * 3.28084
         # If the next waypoint altitude is set to zero, try to approximate
         # setting the alt to the ground's
-        if abs(next_alt) < 10:
+        if (next_alt - self.get_ground_elevation()) < self._config.waypoint_minimum_agl:
             next_alt = self.get_ground_elevation()
         return next_alt
 
@@ -106,7 +109,9 @@ class FlightDataMetrics:
             next_clearance = distance.distance(
                 (next_wp_lat, next_wp_lon), (cur_lat, cur_long)
             ).nm
-            if self.next_waypoint_altitude() <= (self.get_ground_elevation() + 1000):
+            if self.next_waypoint_altitude() <= (
+                self.get_ground_elevation() + self._config.waypoint_minimum_agl
+            ):
                 return WaypointClearance(
                     prev_clearance, self.ground_speed() * self.aq_ete
                 )
@@ -122,13 +127,14 @@ class FlightDataMetrics:
         ground_speed = self.aq_ground_speed * 5.4e-4
         return ground_speed
 
-    def target_altitude_change(self, altitude_change_tolerance=100, minimum_agl=0):
+    def target_altitude_change(self):
         total_descent = self.next_waypoint_altitude() - self.aq_alt_indicated
-        if abs(total_descent) < altitude_change_tolerance:
+        if abs(total_descent) < self._config.altitude_change_tolerance:
             return 0
         return total_descent
 
-    def target_fpm(self, angle):
+    def target_fpm(self):
+        angle = self.choose_slope_angle()
         # https://code7700.com/rot_descent_vvi.htm
         # Convert nm/s to feet/min
         ground_speed = self.ground_speed() * 60 * 6076.118
@@ -149,31 +155,33 @@ class FlightDataMetrics:
             pass
         return fpm
 
-    def distance_to_flc(self, angle):
+    def distance_to_flc(self):
+        angle = self.choose_slope_angle()
         if self.target_altitude_change() == 0:
             return self.get_waypoint_distances().next
 
-        return self.get_waypoint_distances().next - self.flc_length(angle)
+        return self.get_waypoint_distances().next - self.flc_length()
 
-    def time_to_flc(self, angle):
+    def time_to_flc(self):
+        angle = self.choose_slope_angle()
         gspeed = self.ground_speed()
         if gspeed == 0:
             return 0
         if self.target_altitude_change() == 0:
             return self.get_waypoint_distances().next / gspeed
-        seconds = self.distance_to_flc(angle) / gspeed
+        seconds = self.distance_to_flc() / gspeed
         return seconds if seconds > 0 else 0
 
-    def flc_length(self, angle, altitude_change_tolerance=100):
+    def flc_length(self):
         # distance in nm
         # https://www.thinkaviation.net/top-of-descent-calculation/
+        angle = self.choose_slope_angle()
         total_descent = self.target_altitude_change()
         feet_to_nm = 6076.118
         # Solve the triangle to get a chosen degree of of change
         angle = radians(angle)
         distance = (total_descent / tan(angle)) / feet_to_nm
-        # safety_distance = self.ground_speed() * self.descent_safety_factor
-        if abs(total_descent) < altitude_change_tolerance:
+        if abs(total_descent) < self._config.altitude_change_tolerance:
             return 0
         return distance
 
@@ -182,8 +190,12 @@ class FlightDataMetrics:
         dist = self.ground_speed() * self.aq_ete
         return dist
 
-    def choose_angle(self, climb, descend):
-        return float(climb) if self.target_altitude_change() > 0 else float(descend)
+    def choose_slope_angle(self):
+        return (
+            self._config.angle_of_climb
+            if self.target_altitude_change() > 0
+            else self._config.degrees_of_descent
+        )
 
     # def get_approach_minutes(self) -> float:
     #     """Estimate the number of minutes needed for a successful arrival
@@ -211,74 +223,14 @@ class FlightDataMetrics:
     #         raise SimConnectDataError()
 
     #     logging.debug(f"get_approach_minutes(): {agl} ft AGL, {minutes} min")
-    #     return max(minutes, self.min_approach_time)
+    #     return max(minutes, self._config.min_approach_time)
 
 
 class SimrateDiscriminator:
-    def __init__(self, flight_parameters, config=None):
-        self.config = config
+    def __init__(self, flight_parameters, config: SimrateControlConfig):
+        self._config = config
         self.flight_params: FlightDataMetrics = flight_parameters
         self.messages = []
-        if config is None or config.sections() == []:
-            self.max_vsi = 2000
-            self.min_vsi = -2000
-            self.max_bank = 5
-            self.max_pitch = 7
-            self.waypoint_buffer = 40  # seconds
-            self.min_agl_cruise = 1000  # ft
-
-            # These values relate to approach detection
-            self.min_agl_descent = 3000  # ft
-            self.destination_distance = 10  # nm
-            self.min_approach_time = 7  # minutes
-            # Top of descent is estimated as
-            # ((altitude agl)/final_approach)**descent_safety_factor
-            # where ** is the exponentiation operator.
-            # self.final_approach = 500 # fpm
-            self.degrees_of_descent = 3
-            self.descent_safety_factor = 1.0
-            self.pause_at_tod = False
-        else:
-            self.config = config
-            self.min_vsi = int(self.config["stability"]["min_vsi"])
-            self.max_vsi = int(self.config["stability"]["max_vsi"])
-            self.max_bank = int(self.config["stability"]["max_bank"])
-            self.max_pitch = int(self.config["stability"]["max_pitch"])
-            self.waypoint_buffer = int(
-                self.config["stability"]["waypoint_buffer"]
-            )  # seconds
-            self.min_agl_cruise = int(self.config["stability"]["min_agl_cruise"])  # ft
-
-            # These values relate to approach detection
-            self.min_agl_descent = int(
-                self.config["stability"]["min_agl_descent"]
-            )  # ft
-            self.destination_distance = float(
-                self.config["stability"]["destination_distance"]
-            )  # nm
-            self.min_approach_time = int(
-                self.config["stability"]["min_approach_time"]
-            )  # minutes
-            # Top of descent is estimated as
-            # ((altitude agl)/final_approach)**descent_safety_factor
-            # where ** is the exponentiation operator.
-            # self.final_approach = int(self.config['stability']['final_approach']) # fpm
-            self.degrees_of_descent = float(
-                self.config["stability"]["degrees_of_descent"]
-            )
-            self.angle_of_climb = float(self.config["stability"]["angle_of_climb"])
-            self.decel_for_climb = self.config["stability"].getboolean(
-                "decel_for_climb"
-            )
-            self.descent_safety_factor = float(
-                self.config["stability"]["descent_safety_factor"]
-            )
-            self.altitude_change_tolerance = int(
-                self.config["stability"]["altitude_change_tolerance"]
-            )
-            self.ap_nav_guarded = self.config.getboolean("stability", "nav_mode_guarded")
-            self.pause_at_tod = self.config.getboolean("stability", "pause_at_tod")
-
         self.have_paused_at_tod = False
 
     def are_angles_aggressive(self):
@@ -291,7 +243,7 @@ class SimrateDiscriminator:
         try:
             pitch = abs(degrees(self.flight_params.aq_pitch))
             bank = abs(degrees(self.flight_params.aq_bank))
-            if pitch > self.max_pitch or bank > self.max_bank:
+            if pitch > self._config.max_pitch or bank > self._config.max_bank:
                 self.messages.append(
                     f"Agressive angles detected: {int(pitch)} deg {int(bank)} deg"
                 )
@@ -313,7 +265,7 @@ class SimrateDiscriminator:
         agressive = True
         try:
             vsi = self.flight_params.aq_vsi
-            if vsi > self.min_vsi and vsi < self.max_vsi:
+            if vsi > self._config.min_vsi and vsi < self._config.max_vsi:
                 agressive = False
             else:
                 self.messages.append(f"Agressive VS detected: {vsi} ft/s")
@@ -335,7 +287,7 @@ class SimrateDiscriminator:
             sc_nav_mode = int(self.flight_params.aq_nav_mode)
             if sc_autopilot_active and sc_nav_mode:
                 ap_active = True
-            elif not self.ap_nav_guarded and sc_autopilot_active:
+            elif not self._config.ap_nav_guarded and sc_autopilot_active:
                 # Some planes do not report AUTOPILOT_NAV1_LOCK and give
                 # AUTOPILOT_HEADING_LOCK==True and
                 # AUTOPILOT_NAV1_LOCK==False leaving no way for the user to
@@ -386,8 +338,8 @@ class SimrateDiscriminator:
             ground_speed = self.flight_params.aq_ground_speed  # units: meters/sec
             mps_to_nmps = 5.4e-4  # one meter per second to 1 nautical mile per second
             nautical_miles_per_second = ground_speed * mps_to_nmps
-            previous_dist = nautical_miles_per_second * self.waypoint_buffer
-            next_dist = nautical_miles_per_second * self.waypoint_buffer
+            previous_dist = nautical_miles_per_second * self._config.waypoint_buffer
+            next_dist = nautical_miles_per_second * self._config.waypoint_buffer
             clearance = self.flight_params.get_waypoint_distances()
 
             if clearance.prev > previous_dist and clearance.next > next_dist:
@@ -430,9 +382,7 @@ class SimrateDiscriminator:
         return True
 
     def is_past_leg_flc(self):
-        angle = self.flight_params.choose_angle(
-            self.angle_of_climb, self.degrees_of_descent
-        )
+        angle = self.flight_params.choose_slope_angle()
         try:
             # Allow acceleration if the VSI is better than the required.
             if (
@@ -445,13 +395,13 @@ class SimrateDiscriminator:
                 return False
 
             if (
-                not self.decel_for_climb
+                not self._config.decel_for_climb
                 and self.flight_params.target_altitude_change() > 0
             ):
                 return False
 
             if (
-                self.flight_params.time_to_flc(angle) < self.descent_safety_factor
+                self.flight_params.time_to_flc() < self._config.descent_safety_factor
                 and self.flight_params.target_altitude_change() != 0
             ):
                 return True
@@ -478,7 +428,7 @@ class SimrateDiscriminator:
         try:
             last = self.is_last_waypoint()
             if last:
-                too_low = self.is_too_low(self.min_agl_descent)
+                too_low = self.is_too_low(self._config.min_agl_descent)
             else:
                 too_low = False
             autopilot_active = bool(self.flight_params.aq_ap_master)
@@ -492,7 +442,7 @@ class SimrateDiscriminator:
                 self.messages.append(f"Last waypoint and low")
                 approaching = True
 
-            seconds = self.min_approach_time * 60
+            seconds = self._config.min_approach_time * 60
             if self.flight_params.aq_ete < seconds:
                 self.messages.append(f"Less than {seconds/60} minutes from destination")
                 approaching = True
@@ -519,7 +469,7 @@ class SimrateDiscriminator:
                     self.messages.append("Autopilot not enabled.")
                     stable = 1
                 elif self.is_approaching():
-                    if self.pause_at_tod and not self.have_paused_at_tod:
+                    if self._config.pause_at_tod and not self.have_paused_at_tod:
                         self.have_paused_at_tod = True
                         self.messages.append("Pause at TOD.")
                         stable = 0
@@ -529,7 +479,7 @@ class SimrateDiscriminator:
                 elif self.are_angles_aggressive():
                     self.messages.append("Pitch or bank too high")
                     stable = 1
-                elif self.is_too_low(self.min_agl_cruise):
+                elif self.is_too_low(self._config.min_agl_cruise):
                     self.messages.append("Too close to ground.")
                     stable = 1
                 elif self.is_vs_aggressive():
@@ -553,7 +503,7 @@ class SimrateDiscriminator:
             self.messages.append("DATA ERROR: DECEL")
             stable = 1
 
-        return min(stable, int(self.config["simrate"]["max_rate"]))
+        return min(stable, int(self._config.max_rate))
 
     def get_messages(self):
         return self.messages

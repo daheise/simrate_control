@@ -293,6 +293,7 @@ class SimrateDiscriminator:
                 # AUTOPILOT_NAV1_LOCK==False leaving no way for the user to
                 # set the autopilot (e.g. to heading mode) to disable time
                 # acceleration.
+                self.messages.append("Simrate not LNAV guarded.")
                 ap_active = True
             else:
                 ap_active = False

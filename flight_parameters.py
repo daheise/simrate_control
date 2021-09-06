@@ -60,7 +60,6 @@ class FlightDataMetrics:
         self.aq_bank = self._get_value("PLANE_BANK_DEGREES")
         self.aq_vsi = self._get_value("VERTICAL_SPEED")
         self.aq_ap_master = self._get_value("AUTOPILOT_MASTER")
-        self.aq_is_prev_wp_valid = self._get_value("GPS_WP_PREV_VALID")
         self.aq_cur_waypoint_index = self._get_value("GPS_FLIGHT_PLAN_WP_INDEX")
         self.aq_num_waypoints = self._get_value("GPS_FLIGHT_PLAN_WP_COUNT")
         self.aq_agl = self._get_value("PLANE_ALT_ABOVE_GROUND")
@@ -304,7 +303,10 @@ class SimrateDiscriminator:
 
     def is_waypoints_valid(self):
         try:
-            sc_is_prev_wp_valid = self.flight_params.aq_is_prev_wp_valid
+            sc_is_prev_wp_valid = (
+                self.flight_params.aq_prev_wp_lat is not None
+                and self.flight_params.aq_prev_wp_lon is not None
+            )
             sc_cur_waypoint_index = self.flight_params.aq_cur_waypoint_index
             sc_num_waypoints = self.flight_params.aq_num_waypoints
             if (

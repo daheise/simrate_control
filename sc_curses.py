@@ -88,7 +88,7 @@ Messages:
     def write_waypoint_distance(self, dist: float):
         self._screen.addstr(6, 15, f"{dist:.2f}nm")
 
-    def write_tod_time(self, seconds, simrate = 1):
+    def write_tod_time(self, seconds, simrate=1):
         seconds /= simrate
         if seconds > 0:
             seconds = min(24 * 3600 - 1, seconds)

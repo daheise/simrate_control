@@ -20,7 +20,7 @@ AP Mode:
 Pitch/Bank:     /          Max Pitch/Bank:     / 
 Alt:                       Ground Alt: 
 Waypoint:                  G. Speed: 
-Waypoint Dist:             FLC:          / 
+Waypoint Dist:             FLC:                / 
 Waypoint Alt:              Target VS/Slope:         / 
 VS:                        Needed VS: 
 AGL:                       Min AGL: 
@@ -58,7 +58,8 @@ Messages:
         self._screen.addstr(11, 46, f"{str(status)}")
 
     def write_ap_mode(self, mode: str) -> None:
-        self._screen.addstr(2, 9, str(mode).ljust(3))
+        msg = "On" if mode else "Off"
+        self._screen.addstr(2, 9, str(msg).ljust(3))
 
     def write_pitch(self, angle) -> None:
         self._screen.addstr(3, 13, f"{str(int(angle))}°")
@@ -87,16 +88,17 @@ Messages:
     def write_waypoint_distance(self, dist: float):
         self._screen.addstr(6, 15, f"{dist:.2f}nm")
 
-    def write_tod_time(self, seconds):
+    def write_tod_time(self, seconds, simrate=1):
+        seconds /= simrate
         if seconds > 0:
             seconds = min(24 * 3600 - 1, seconds)
         else:
             seconds = 0
         td = timedelta(seconds=int(seconds))
-        self._screen.addstr(6, 32, f"{str(td)}")
+        self._screen.addstr(6, 32, f"{str(td)} ({simrate:.0f}x)")
 
     def write_tod_distance(self, nm):
-        self._screen.addstr(6, 43, f"{nm:.1f}nm")
+        self._screen.addstr(6, 49, f"{nm:.1f}nm")
 
     def write_waypoint_alt(self, feet: float):
         self._screen.addstr(7, 14, f"{str(int(feet))}ft")

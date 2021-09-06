@@ -1,3 +1,4 @@
+from sc_config import SimrateControlConfig
 from sc_curses import ScCurses
 from flight_parameters import (
     FlightDataMetrics,
@@ -26,25 +27,10 @@ from geopy import distance
 class SimRateManager:
     """Manages the game sim rate, and audible annunciation."""
 
-    def __init__(self, sm, config=None):
+    def __init__(self, sm, config):
         self.sm = sm
-        self.config = config
+        self._config = config
         self.have_paused_at_tod = False
-        if config is None or config.sections() == []:
-            self.min_rate = 1
-            self.max_rate = 4
-            self.annunciation = True
-        else:
-            self.config = config
-            self.min_rate = int(self.config["simrate"]["min_rate"])
-            # If the user set something like "5" the simrate would go back and forth
-            # because the game only has rates of the form 2**x. This formula will always
-            # set the simrate to the valid simrate <= to the configured
-            # simrate. 2**(floor(log2(x)))
-            self.max_rate = int(
-                2 ** floor(log2(int(self.config["simrate"]["max_rate"])))
-            )
-            self.annunciation = config.getboolean("simrate", "annunciation")
 
         self.aq = AircraftRequests(self.sm)
         self.ae = AircraftEvents(self.sm)
@@ -77,7 +63,7 @@ class SimRateManager:
 
     def say_sim_rate(self):
         """Speak the current sim rate using text-to-speech"""
-        if not self.annunciation:
+        if not self._config.annunciation:
             return
 
         try:
@@ -93,7 +79,7 @@ class SimRateManager:
     def pause(self):
         """Pause the sim"""
         self.ae_pause()
-        if self.annunciation:
+        if self._config.annunciation:
             self.tts_engine.say(f"Paused at todd")
             self.tts_engine.runAndWait()
 
@@ -102,7 +88,7 @@ class SimRateManager:
         simrate = self.get_sim_rate()
         if simrate is None:
             return
-        while simrate > self.min_rate:
+        while simrate > self._config.min_rate:
             sleep(2)
             self.decelerate()
             simrate /= 2
@@ -112,11 +98,11 @@ class SimRateManager:
         simrate = self.get_sim_rate()
         if simrate is None:
             return
-        if simrate > self.min_rate:
+        if simrate > self._config.min_rate:
             self.decrease_sim_rate()
             self.set_barometer()
             self.heading_select_bug()
-        elif simrate < self.min_rate:
+        elif simrate < self._config.min_rate:
             self.increase_sim_rate()
             self.set_barometer()
             self.heading_select_bug()
@@ -126,11 +112,11 @@ class SimRateManager:
         simrate = self.get_sim_rate()
         if simrate is None:
             return
-        if simrate < self.max_rate:
+        if simrate < self._config.max_rate:
             self.increase_sim_rate()
             self.set_barometer()
             self.heading_select_bug()
-        elif simrate > self.max_rate:
+        elif simrate > self._config.max_rate:
             self.decrease_sim_rate()
             self.set_barometer()
             self.heading_select_bug()
@@ -158,6 +144,7 @@ class SimRateManager:
 
 def write_screen(
     sc_curses: ScCurses,
+    config: SimrateControlConfig,
     flight_data_parameters: FlightDataMetrics,
     simrate_discriminator: SimrateDiscriminator,
     simrate_manager: SimRateManager,
@@ -174,36 +161,18 @@ def write_screen(
         flight_data_parameters.get_waypoint_distances().next
     )
     sc_curses.write_waypoint_alt(flight_data_parameters.next_waypoint_altitude())
-    if flight_data_parameters.target_altitude_change() > 0:
-        sc_curses.write_target_vspeed(
-            flight_data_parameters.target_fpm(simrate_discriminator.angle_of_climb)
-        )
-        sc_curses.write_target_slope(simrate_discriminator.angle_of_climb)
-        sc_curses.write_tod_distance(
-            flight_data_parameters.distance_to_flc(simrate_discriminator.angle_of_climb)
-        )
-        sc_curses.write_tod_time(
-            flight_data_parameters.time_to_flc(simrate_discriminator.angle_of_climb)
-        )
-    else:
-        sc_curses.write_target_vspeed(
-            flight_data_parameters.target_fpm(simrate_discriminator.degrees_of_descent)
-        )
-        sc_curses.write_target_slope(simrate_discriminator.degrees_of_descent)
-        sc_curses.write_tod_distance(
-            flight_data_parameters.distance_to_flc(
-                simrate_discriminator.degrees_of_descent
-            )
-        )
-        sc_curses.write_tod_time(
-            flight_data_parameters.time_to_flc(simrate_discriminator.degrees_of_descent)
-        )
+    sc_curses.write_target_vspeed(flight_data_parameters.target_fpm())
+    sc_curses.write_target_slope(flight_data_parameters.choose_slope_angle())
+    sc_curses.write_tod_distance(flight_data_parameters.distance_to_flc())
+    sc_curses.write_tod_time(
+        flight_data_parameters.time_to_flc(), simrate_manager.get_sim_rate()
+    )
     sc_curses.write_vspeed(flight_data_parameters.aq_vsi)
     sc_curses.write_needed_vspeed(flight_data_parameters.required_fpm())
-    sc_curses.write_max_bank(simrate_discriminator.max_bank)
-    sc_curses.write_max_pitch(simrate_discriminator.max_pitch)
+    sc_curses.write_max_bank(config.max_bank)
+    sc_curses.write_max_pitch(config.max_pitch)
     sc_curses.write_ap_mode(simrate_discriminator.is_ap_active())
-    sc_curses.write_min_agl(simrate_discriminator.min_agl_cruise)
+    sc_curses.write_min_agl(config.min_agl_cruise)
     sc_curses.write_agl(flight_data_parameters.aq_agl)
     sc_curses.write_alt(flight_data_parameters.aq_alt_indicated)
     sc_curses.write_ete(flight_data_parameters.aq_ete)
@@ -235,8 +204,7 @@ def main(stdscr):
 
     stdscr.nodelay(True)
     ui = ScCurses(stdscr)
-    config = configparser.ConfigParser()
-    config.read("config.ini")
+    config = SimrateControlConfig("config.ini")
     ui.write_message("Not connected...")
     sm = None
     srm = None
@@ -252,7 +220,7 @@ def main(stdscr):
             sm = connect(0)
         else:
             if flight_data_metrics is None:
-                flight_data_metrics = FlightDataMetrics(sm)
+                flight_data_metrics = FlightDataMetrics(sm, config)
                 flight_stability = SimrateDiscriminator(flight_data_metrics, config)
             if srm is None:
                 srm = SimRateManager(sm, config)
@@ -264,12 +232,14 @@ def main(stdscr):
                 max_stable_rate = flight_stability.get_max_sim_rate()
                 messages += flight_stability.get_messages()
                 messages += srm.update(max_stable_rate)
-                write_screen(ui, flight_data_metrics, flight_stability, srm, messages)
+                write_screen(
+                    ui, config, flight_data_metrics, flight_stability, srm, messages
+                )
                 sleep(0.01)
             except (SimConnectDataError, AttributeError, TypeError) as e:
                 messages.append("DATA ERROR")
                 messages.append(str(e))
-                if config.getboolean("simrate", "decelerate_on_simconnect_error"):
+                if config.decelerate_on_simconnect_error:
                     srm.decelerate()
             except KeyboardInterrupt:
                 srm.stop_acceleration()

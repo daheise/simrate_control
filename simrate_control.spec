@@ -13,7 +13,7 @@ def find_file_by_name(name, paths):
 a = Analysis(['simrate_control.py'],
              pathex=[SPECPATH],
              binaries=[(find_file_by_name('SimConnect.dll', [SPECPATH] + sys.path), './SimConnect/')],
-             datas=[('config.ini', './')],
+             datas=[('config.ini', './'), ('README.md', './'), ('LICENSE', './')],
              hiddenimports=['pyttsx3.drivers','pyttsx3.drivers.sapi5'],
              hookspath=[],
              runtime_hooks=[],

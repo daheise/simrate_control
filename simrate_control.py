@@ -164,7 +164,7 @@ def write_screen(
     sc_curses.write_target_vspeed(flight_data_parameters.target_fpm())
     sc_curses.write_target_slope(flight_data_parameters.choose_slope_angle())
     sc_curses.write_tod_distance(flight_data_parameters.distance_to_flc())
-    sc_curses.write_tod_time(flight_data_parameters.time_to_flc())
+    sc_curses.write_tod_time(flight_data_parameters.time_to_flc(), simrate_manager.get_sim_rate())
     sc_curses.write_vspeed(flight_data_parameters.aq_vsi)
     sc_curses.write_needed_vspeed(flight_data_parameters.required_fpm())
     sc_curses.write_max_bank(config.max_bank)

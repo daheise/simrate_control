@@ -3,6 +3,12 @@ import curses
 import time
 import textwrap
 from datetime import timedelta
+from enum import Enum, auto
+
+class CursesCommands(Enum):
+    QUIT = auto()
+    STOP_ACCEL = auto()
+    NORMAL = auto()
 
 
 class ScCurses:
@@ -10,6 +16,7 @@ class ScCurses:
         self._screen = screen
         self._screen.nodelay(True)
         self.write_layout()
+        self._state = CursesCommands.NORMAL
         self._messages = []
 
     def write_layout(self):
@@ -150,6 +157,11 @@ Messages:
         self._screen.clear()
         self.write_layout()
         if k == ord("q") or k == 3:
-            return False
-        else:
-            return True
+            self._state = CursesCommands.QUIT
+            return self._state
+        elif k == ord('p'):
+            if self._state == CursesCommands.STOP_ACCEL:
+                self._state = CursesCommands.NORMAL
+            else:
+                self._state = CursesCommands.STOP_ACCEL
+        return self._state

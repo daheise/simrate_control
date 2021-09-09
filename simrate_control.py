@@ -1,5 +1,5 @@
 from sc_config import SimrateControlConfig
-from sc_curses import ScCurses
+from sc_curses import ScCurses, CursesCommands
 from flight_parameters import (
     FlightDataMetrics,
     SimrateDiscriminator,
@@ -210,7 +210,10 @@ def main(stdscr):
     srm = None
     flight_data_metrics = None
     flight_stability = None
-    while ui.update():
+    while True:
+        user_input = ui.update()
+        if user_input == CursesCommands.QUIT:
+            break
         messages = []
         if sm is None:
             ui.write_message("Not connected...")
@@ -229,7 +232,11 @@ def main(stdscr):
         if sm is not None and srm is not None:
             try:
                 flight_data_metrics.update()
-                max_stable_rate = flight_stability.get_max_sim_rate()
+                if user_input == CursesCommands.STOP_ACCEL:
+                    max_stable_rate = 1
+                    ui.write_message("Acceleration paused by user")
+                else:
+                    max_stable_rate = flight_stability.get_max_sim_rate()
                 messages += flight_stability.get_messages()
                 messages += srm.update(max_stable_rate)
                 write_screen(

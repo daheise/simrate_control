@@ -404,7 +404,7 @@ class SimrateDiscriminator:
             return True
         return False
 
-    def is_approaching(self):
+    def is_flc_needed(self):
         """Checks several items to see if we are "arriving" because there are
         different ways a flight plan may be set up.
 
@@ -442,9 +442,11 @@ class SimrateDiscriminator:
                 self.messages.append(f"Less than {seconds/60} minutes from destination")
                 approaching = True
 
-            if autopilot_active and approach_hold:
+            if autopilot_active and approach_hold and self._config.ap_approach_hold_guarded:
                 self.messages.append("Approach hold mode on")
                 approaching = True
+            elif autopilot_active and approach_hold and not self._config.ap_approach_hold_guarded:
+                self.messages.append("Approach hold unguarded")
 
         except TypeError:
             raise SimConnectDataError()
@@ -462,7 +464,7 @@ class SimrateDiscriminator:
             if self.is_waypoints_valid():
                 if not self.is_ap_active():
                     stable = 1
-                elif self.is_approaching():
+                elif self.is_flc_needed():
                     if self._config.pause_at_tod and not self.have_paused_at_tod:
                         self.have_paused_at_tod = True
                         self.messages.append("Pause at TOD.")

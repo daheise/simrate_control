@@ -71,6 +71,10 @@ class FlightDataMetrics:
         self.aq_ete = self._get_value("GPS_ETE")
         self.aq_ground_speed = self._get_value("GPS_GROUND_SPEED")
         self.aq_ground_elevation = self._get_value("GROUND_ALTITUDE")
+        self.aq_flaps_percent = max(
+            self._get_value("TRAILING_EDGE_FLAPS_LEFT_PERCENT"),
+            self._get_value("TRAILING_EDGE_FLAPS_RIGHT_PERCENT"),
+        )
 
         ident = self._get_value("GPS_WP_NEXT_ID").decode("utf-8")
         self.aq_next_wp_ident = (
@@ -193,34 +197,6 @@ class FlightDataMetrics:
             if self.target_altitude_change() > 0
             else self._config.degrees_of_descent
         )
-
-    # def get_approach_minutes(self) -> float:
-    #     """Estimate the number of minutes needed for a successful arrival
-    #     based on AGL.
-    #     Parameters
-    #     ----------
-    #     final_fpm: Estimate of a typical descent speed on final.
-    #     performance_exponent: Exponent that represents whether to become more
-    #         or less conservative on your descent as altitude increases. 1.0
-    #         would indicate that you intend to descend at final_fpm dur the
-    #         entire descent. Less than one is higher descent speed at higher
-    #         altitude. Greater than 1 would be descending slower at higher
-    #         altitudes.
-    #     minimum: The minimum minutes this function will return.
-
-    #     Known Issue: This may cause some sim rate rubber banding as altitude
-    #     changes.
-    #     """
-    #     minutes = 0
-    #     try:
-    #         agl = self.aq_agl.value
-    #         minutes = (agl/self.final_fpm)**(self.performance_exponent)
-
-    #     except TypeError:
-    #         raise SimConnectDataError()
-
-    #     logging.debug(f"get_approach_minutes(): {agl} ft AGL, {minutes} min")
-    #     return max(minutes, self._config.min_approach_time)
 
 
 class SimrateDiscriminator:
@@ -442,16 +418,32 @@ class SimrateDiscriminator:
                 self.messages.append(f"Less than {seconds/60} minutes from destination")
                 approaching = True
 
-            if autopilot_active and approach_hold and self._config.ap_approach_hold_guarded:
+            if (
+                autopilot_active
+                and approach_hold
+                and self._config.ap_approach_hold_guarded
+            ):
                 self.messages.append("Approach hold mode on")
                 approaching = True
-            elif autopilot_active and approach_hold and not self._config.ap_approach_hold_guarded:
+            elif (
+                autopilot_active
+                and approach_hold
+                and not self._config.ap_approach_hold_guarded
+            ):
                 self.messages.append("Approach hold unguarded")
 
         except TypeError:
             raise SimConnectDataError()
 
         return approaching
+
+    def is_cruise_configured(self):
+        cruise_configured = True
+        if self.flight_params.aq_flaps_percent > 0:
+            cruise_configured = False
+            self.messages.append("Flaps extended")
+
+        return cruise_configured
 
     def get_max_sim_rate(self):
         """Returns what is considered the maximum stable sim rate.
@@ -463,6 +455,11 @@ class SimrateDiscriminator:
         try:
             if self.is_waypoints_valid():
                 if not self.is_ap_active():
+                    stable = 1
+                elif (
+                    not self.is_cruise_configured()
+                    and self._config.check_cruise_configuration
+                ):
                     stable = 1
                 elif self.is_flc_needed():
                     if self._config.pause_at_tod and not self.have_paused_at_tod:

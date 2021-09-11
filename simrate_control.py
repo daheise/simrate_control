@@ -225,18 +225,25 @@ def main(stdscr):
             if flight_data_metrics is None:
                 flight_data_metrics = FlightDataMetrics(sm, config)
                 flight_stability = SimrateDiscriminator(flight_data_metrics, config)
+                # This will be used to toggle pause on and off
+                simrate_functions = [flight_stability.get_max_sim_rate, lambda: 1]
             if srm is None:
                 srm = SimRateManager(sm, config)
             ui.write_message("Connected to simulator.")
 
         if sm is not None and srm is not None:
             try:
-                flight_data_metrics.update()
-                if user_input == CursesCommands.STOP_ACCEL:
-                    max_stable_rate = 1
+                if user_input == CursesCommands.TOGGLE_ACCEL:
+                    simrate_functions.reverse()
+                if user_input == CursesCommands.TOGGLE_WAYPOINTS:
+                    config.waypoint_vnav = not config.waypoint_vnav
+
+                if not config.waypoint_vnav:
+                    ui.write_message("Waypoint vertical detection disabled")
+                if simrate_functions[0] != flight_stability.get_max_sim_rate:
                     ui.write_message("Acceleration paused by user")
-                else:
-                    max_stable_rate = flight_stability.get_max_sim_rate()
+                flight_data_metrics.update()
+                max_stable_rate = simrate_functions[0]()
                 messages += flight_stability.get_messages()
                 messages += srm.update(max_stable_rate)
                 write_screen(

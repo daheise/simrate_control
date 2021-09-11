@@ -83,6 +83,8 @@ class SimrateControlConfig:
                 "stability", "check_cruise_configuration"
             )
 
+            self.waypoint_vnav = self._config.getboolean("stability", "waypoint_vnav")
+
             self.pause_at_tod = self._config.getboolean("stability", "pause_at_tod")
 
             self.altitude_change_tolerance = int(

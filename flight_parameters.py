@@ -79,8 +79,11 @@ class FlightDataMetrics:
         ident = self._get_value("GPS_WP_NEXT_ID").decode("utf-8")
         self.aq_next_wp_ident = (
             ident
-            if self.next_waypoint_altitude()
-            > (self.get_ground_elevation() + self._config.waypoint_minimum_agl)
+            if (
+                self.next_waypoint_altitude()
+                > (self.get_ground_elevation() + self._config.waypoint_minimum_agl)
+                and self._config.waypoint_vnav
+            )
             else f"LAND ({ident})"
         )
 
@@ -88,7 +91,9 @@ class FlightDataMetrics:
         next_alt = self.aq_next_wp_alt * 3.28084
         # If the next waypoint altitude is set to zero, try to approximate
         # setting the alt to the ground's
-        if (next_alt - self.get_ground_elevation()) < self._config.waypoint_minimum_agl:
+        if (
+            next_alt - self.get_ground_elevation()
+        ) < self._config.waypoint_minimum_agl or not self._config.waypoint_vnav:
             next_alt = self.get_ground_elevation()
         return next_alt
 
@@ -112,8 +117,10 @@ class FlightDataMetrics:
             next_clearance = distance.distance(
                 (next_wp_lat, next_wp_lon), (cur_lat, cur_long)
             ).nm
-            if self.next_waypoint_altitude() <= (
-                self.get_ground_elevation() + self._config.waypoint_minimum_agl
+            if (
+                self.next_waypoint_altitude()
+                <= (self.get_ground_elevation() + self._config.waypoint_minimum_agl)
+                or not self._config.waypoint_vnav
             ):
                 return WaypointClearance(
                     prev_clearance, self.ground_speed() * self.aq_ete

@@ -91,10 +91,10 @@ speed, you may see some simrate rubber banding as you cross thresholds for FLC
 estimation and ETE estimates.
 
 There is also an option (`pause_at_tod`) to pause the game at FLC detection.
-This is disabled by default. Only set this to "True" if you have a key bound to
-the in game "SET PAUSE OFF" binding. The binding IS NOT set by default in game.
-The "Toggle Pause" binding does not suffice. You can also unpause the game by
-toggling acceleration in Simrate Control by pressing the "p" key.
+This is disabled by default. Setting this option implies `waypoint_vnav =
+False`. You can unpause the game by in Simrate Control by pressing the "r" key,
+or in the simulator by pressing the key bound to "PAUSE OFF". Pause at TOD will
+only trigger once per start up of Simrate Control.
 
 ## Quickstart SimRate Control
 
@@ -104,9 +104,13 @@ toggling acceleration in Simrate Control by pressing the "p" key.
 
 ## Key bindings
 
-* Press 'w' to toggle between waypoint-by-waypoint altitude detection.
-* Press 'p' to toggle simrate adjustment on/off, and to unpause the game.
+* Press 'w' to toggle waypoint-by-waypoint altitude detection.
+* Press 'p' to toggle simrate adjustment on/off.
+* Press 'r' to resume after a pause at TOD.
 * Press 'q' or 'Ctrl + C' to set simrate to the minimum and exit.
+
+NOTE: Key presses do not take effect until the next screen update, so there may
+be some delay between press and effect.
 
 ## Configuration
 

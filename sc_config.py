@@ -38,6 +38,7 @@ class SimrateControlConfig:
             )
             self.max_rate = float(self._config["simrate"]["max_rate"])
             self.min_rate = float(self._config["simrate"]["min_rate"])
+            self.cautious_rate = float(self._config["simrate"]["cautious_rate"])
 
             self.min_vsi = int(self._config["stability"]["min_vsi"])
             self.max_vsi = int(self._config["stability"]["max_vsi"])
@@ -83,6 +84,8 @@ class SimrateControlConfig:
                 "stability", "check_cruise_configuration"
             )
 
+            self.waypoint_vnav = self._config.getboolean("stability", "waypoint_vnav")
+
             self.pause_at_tod = self._config.getboolean("stability", "pause_at_tod")
 
             self.altitude_change_tolerance = int(
@@ -91,3 +94,6 @@ class SimrateControlConfig:
             self.waypoint_minimum_agl = int(
                 self._config["metrics"]["waypoint_minimum_agl"]
             )
+
+            if self.pause_at_tod:
+                self.waypoint_vnav = False

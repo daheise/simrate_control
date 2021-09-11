@@ -9,7 +9,9 @@ from typing import OrderedDict
 
 class CursesCommands(Enum):
     QUIT = auto()
-    STOP_ACCEL = auto()
+    TOGGLE_ACCEL = auto()
+    TOGGLE_WAYPOINTS = auto()
+    UNPAUSE = auto()
     NORMAL = auto()
 
 
@@ -161,11 +163,11 @@ Messages:
         self._screen.clear()
         self.write_layout()
         if k == ord("q") or k == 3:
-            self._state = CursesCommands.QUIT
-            return self._state
+            return CursesCommands.QUIT
         elif k == ord("p"):
-            if self._state == CursesCommands.STOP_ACCEL:
-                self._state = CursesCommands.NORMAL
-            else:
-                self._state = CursesCommands.STOP_ACCEL
-        return self._state
+            return CursesCommands.TOGGLE_ACCEL
+        elif k == ord("w"):
+            return CursesCommands.TOGGLE_WAYPOINTS
+        elif k == ord("r"):
+            return CursesCommands.UNPAUSE
+        return CursesCommands.NORMAL

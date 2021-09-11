@@ -1,6 +1,6 @@
 ![Simrate_control_stable](https://user-images.githubusercontent.com/5230957/132078269-3588d11b-978a-4110-85bc-a634f18469c8.PNG)
 
-## SimRate Control Theory of Operations
+# Get-there-itis Simrate Control
 
 This project is increases the sim rate while following a flight plan on
 autopilot. At the moment the controller checks the parameters below before
@@ -19,70 +19,98 @@ uses waypoint altitudes to determine some sim rate conditions.
 Specific cited values for condition detection are subject to change. Most have
 configuration options in the `config.ini`.
 
-**Sim Rate**
 
-Maximum simrate is 4x. Beyond 4x and flight become unstable by the other metrics
-and things just waffle back and forth.
+## Simrate Contraints
 
-**Flight Plan**
+Many of the parameters below are configurable. Text that `looks like this`
+refers to a parameter that can be found in the config.ini.
 
-A flight plan must be loaded into the autopilot.
+### Maximum, Cautious, and Minimum Sim Rate
+
+The maximum, cautious, and minimum simrates are configurable(`max_rate`,
+`cautious_rate`, `min_rate`). During straight and level flight, the maximum
+simrate (default 4x) will be selected. During maneuvers the simrate will reduce
+to the cautious simrate (default 2x). During critical flight phases (namely
+ascent and approach) the minimum simrate will be selected (default 1x).
+
+It is suggested not to increase the maximum rate beyond 4x, as the autopilot has
+trouble maintain track and level flight. Decreasing the minimum simrate is also
+not recommended.
+
+### Flight Plan
+
+A flight plan must be loaded into the autopilot from the world map. See the
+[pinned issues](https://github.com/daheise/simrate_control/issues) for some
+workarounds for some mods/third party planes.
 
 **Autopilot Settings**
 
-Autopilot must be turned on and in lateral navigation ([L]NAV) mode.
+Autopilot must be turned on and in lateral navigation ([L]NAV) mode. There is a
+configuration option (`nav_mode_guarded`) to disable the LNAV constraint.
 
 **Altitude**
 
-Acceleration will only function 1000ft AGL or higher.
+Acceleration will only function above a configured (`min_agl_cruise`) altitude
+above ground level (AGL).
 
 **Waypoint Proximity**
 
-When the plane is 40 seconds away from a waypoint (approaching or departing)
-based on ground speed, the acceleration will reduce to 2x. This allows for time
-acceleration through a waypoint that does not involve a turn, but will minimize
-instability cause by the delay between the start of a turn and detection.
+When the plane is `waypoint_buffer` seconds away from a waypoint (regardless of
+direction) based on ground speed, the acceleration will reduce to the cautious
+simrate. This allows for time acceleration through a waypoint that does not
+involve a turn, but will minimize instability caused by accelerated maneuvers.
 
 **Pitch and Bank**
 
-Pitch and bank must have minimal deviations from straight and level.
+Pitch and bank must have minimal deviations (`max_bank`, `max_pitch`) from
+straight and level. If the constraint is violated, simrate will reduce to the
+cautious simrate.
 
 **Flight Level Change and Approach**
 
-If the next waypoint altitude is lower than the plane, then the plane must be
-far enough away (measured in time) and at a vertical speed that would allow the
-plane to execute a configured glidescope descent and meet the target altitude.
-This functions similarly for ascent. There is also a configurable additional
-time before these conditions would occur to allow you to set up your autopilot
-for ascent/descent. Ascent detection can be turned off.
+By default waypoint altitudes are used to detect needed flight level changes
+(FLC), based on the configured ascent and descent slopes (`angle_of_climb`,
+`degrees_of_descent`). If `waypoint_vnav = False` then the only constraint will
+be the top of descent to the destination based on current ground speed and
+altitude. Simrate will be reduced to the minimum at `descent_safety_factor`
+seconds before the FLC is needed to give time to set up for the FLC. If the
+vertical speed is equal to or better than the "Required FPM" then acceleration
+will be reenabled. The ascent constraint can be turned off separately
+(`decel_for_climb`).
 
-The plane must be far enough away from the a destination. An approach is
-detected based on a few conditions. User should still be mindful of the
-potential for an undetected arrival or late arrival detection. If you descend
-aggressively or drastically change ground speed, you may see some simrate rubber
-banding as you cross thresholds for flight level change estimation and ETE
-estimates.
+An approach is detected based on a few conditions.
 
-There is also an option in the configuration file to pause the game at initial
-approach detection. This is disabled by default. Only set this to "True" if you
-have a key bound to the in game "SET PAUSE OFF" binding. The binding IS NOT set
-by default in game. The simrate controller does not unpause the game. The
-"Toggle Pause" binding does not suffice.
+1. Whether you are on the last waypoint and below `min_agl_descent` AGL
+2. Whether approach hold mode is on (`approach_hold_guarded`)
+3. If flaps are down, or spoilers are activated (`check_cruise_configuration`).
+4. You are less than `min_approach_time` from the destination.
 
-1. The last leg of the flight plan is active, and the plane is lower than a configured AGL.
-[Screenshot](https://user-images.githubusercontent.com/5230957/98481103-f5244180-21c5-11eb-899c-8ea748daad4c.PNG)
-2. Distance to waypoint (or destination) is less than an estimated distance needed for a flight level change.
-[Screenshot](https://user-images.githubusercontent.com/5230957/98481109-f5bcd800-21c5-11eb-9403-062f325c4a7b.PNG)
-3. ETE to destination is less than a configured minimum.
-[Screenshot](https://user-images.githubusercontent.com/5230957/98481108-f5bcd800-21c5-11eb-8096-437def4d4939.PNG)
-4. Approach mode is active.
-[Screenshot](https://user-images.githubusercontent.com/5230957/98481102-f48bab00-21c5-11eb-946e-7a2e3a5653b7.PNG)
+User should still be mindful of the potential for an undetected arrival or late
+arrival detection. If you descend aggressively or drastically change ground
+speed, you may see some simrate rubber banding as you cross thresholds for FLC
+estimation and ETE estimates.
+
+There is also an option (`pause_at_tod`) to pause the game at FLC detection.
+This is disabled by default. Setting this option implies `waypoint_vnav =
+False`. You can unpause the game by in Simrate Control by pressing the "r" key,
+or in the simulator by pressing the key bound to "PAUSE OFF". Pause at TOD will
+only trigger once per start up of Simrate Control.
 
 ## Quickstart SimRate Control
 
 1. Download the release zip file.
 2. Unzip in the location of your choice
 3. Run simrate_control.exe
+
+## Key bindings
+
+* Press 'w' to toggle waypoint-by-waypoint altitude detection.
+* Press 'p' to toggle simrate adjustment on/off.
+* Press 'r' to resume after a pause at TOD.
+* Press 'q' or 'Ctrl + C' to set simrate to the minimum and exit.
+
+NOTE: Key presses do not take effect until the next screen update, so there may
+be some delay between press and effect.
 
 ## Configuration
 

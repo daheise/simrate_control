@@ -79,8 +79,11 @@ class FlightDataMetrics:
         ident = self._get_value("GPS_WP_NEXT_ID").decode("utf-8")
         self.aq_next_wp_ident = (
             ident
-            if self.next_waypoint_altitude()
-            > (self.get_ground_elevation() + self._config.waypoint_minimum_agl)
+            if (
+                self.next_waypoint_altitude()
+                > (self.get_ground_elevation() + self._config.waypoint_minimum_agl)
+                and self._config.waypoint_vnav
+            )
             else f"LAND ({ident})"
         )
 
@@ -88,7 +91,9 @@ class FlightDataMetrics:
         next_alt = self.aq_next_wp_alt * 3.28084
         # If the next waypoint altitude is set to zero, try to approximate
         # setting the alt to the ground's
-        if (next_alt - self.get_ground_elevation()) < self._config.waypoint_minimum_agl:
+        if (
+            next_alt - self.get_ground_elevation()
+        ) < self._config.waypoint_minimum_agl or not self._config.waypoint_vnav:
             next_alt = self.get_ground_elevation()
         return next_alt
 
@@ -112,8 +117,10 @@ class FlightDataMetrics:
             next_clearance = distance.distance(
                 (next_wp_lat, next_wp_lon), (cur_lat, cur_long)
             ).nm
-            if self.next_waypoint_altitude() <= (
-                self.get_ground_elevation() + self._config.waypoint_minimum_agl
+            if (
+                self.next_waypoint_altitude()
+                <= (self.get_ground_elevation() + self._config.waypoint_minimum_agl)
+                or not self._config.waypoint_vnav
             ):
                 return WaypointClearance(
                     prev_clearance, self.ground_speed() * self.aq_ete
@@ -467,34 +474,34 @@ class SimrateDiscriminator:
                         self.messages.append("Pause at TOD.")
                         stable = 0
                     else:
-                        stable = 1
+                        stable = self._config.min_rate
                     self.messages.append("Flight level change needed.")
-                elif self.are_angles_aggressive():
-                    self.messages.append("Pitch or bank too high")
-                    stable = 1
                 elif self.is_too_low(self._config.min_agl_cruise):
                     self.messages.append("Too close to ground.")
-                    stable = 1
+                    stable = self._config.min_rate
+                elif self.are_angles_aggressive():
+                    self.messages.append("Pitch or bank too high")
+                    stable = self._config.cautious_rate
                 elif self.is_vs_aggressive():
                     # pitch/bank may be a better/suffcient proxy
                     self.messages.append("Vertical speed too high.")
-                    stable = 2
+                    stable = self._config.cautious_rate
                 elif self.is_waypoint_close():
                     # The AP will switch waypoints several seconds away to cut corners,
                     # so we slow down far enough away that we don't enter a turn prior
                     # to slowing down (4nm). To keep from speeding up immediately when
                     # a corner is cut we also give until 2.5nm after the switch
                     self.messages.append("Close to waypoint.")
-                    stable = 2
+                    stable = self._config.cautious_rate
                 else:
                     self.messages.append("Flight stable")
                     stable = self._config.max_rate
             else:
                 self.messages.append("No valid flight plan. Stability undefined.")
-                stable = 1
+                stable = self._config.min_rate
         except SimConnectDataError as e:
             self.messages.append("DATA ERROR: DECEL")
-            stable = 1
+            stable = self._config.min_rate
 
         return min(stable, int(self._config.max_rate))
 

@@ -98,6 +98,8 @@ pyinstaller .\simrate_control.spec
 
 ## Known Issues
 
+* A flight plan must have at least one waypoint between departure and
+  destination, otherwise the waypoints do not progress correctly.
 * This utility is only tested extensively with default planes. Mods and third
   party planes often do not have the simvars this utilty relies on, and may
   behave in unexpected ways or not at all. For example, the FlyByWire A320NX

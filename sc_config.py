@@ -79,6 +79,9 @@ class SimrateControlConfig:
             self.ap_approach_hold_guarded = self._config.getboolean(
                 "stability", "approach_hold_guarded"
             )
+            self.check_cruise_configuration = self._config.getboolean(
+                "stability", "check_cruise_configuration"
+            )
 
             self.pause_at_tod = self._config.getboolean("stability", "pause_at_tod")
 

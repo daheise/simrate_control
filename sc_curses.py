@@ -4,6 +4,8 @@ import time
 import textwrap
 from datetime import timedelta
 from enum import Enum, auto
+from typing import OrderedDict
+
 
 class CursesCommands(Enum):
     QUIT = auto()
@@ -138,6 +140,8 @@ Messages:
     def _write_messages_to_screen(self):
         i = 12
         max_messages = curses.LINES - 1 - i
+        # Deduplicate messages
+        self._messages = list(OrderedDict.fromkeys(self._messages))
         for m in self._messages[0:max_messages]:
             self._screen.addstr(i, 0, f"{m}")
             i += 1
@@ -159,7 +163,7 @@ Messages:
         if k == ord("q") or k == 3:
             self._state = CursesCommands.QUIT
             return self._state
-        elif k == ord('p'):
+        elif k == ord("p"):
             if self._state == CursesCommands.STOP_ACCEL:
                 self._state = CursesCommands.NORMAL
             else:

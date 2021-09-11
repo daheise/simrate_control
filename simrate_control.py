@@ -242,9 +242,10 @@ def main(stdscr):
             try:
                 if user_input == CursesCommands.TOGGLE_ACCEL:
                     simrate_functions.reverse()
-                    srm.unpause()
                 if user_input == CursesCommands.TOGGLE_WAYPOINTS:
                     config.waypoint_vnav = not config.waypoint_vnav
+                if user_input == CursesCommands.UNPAUSE:
+                    srm.unpause()
 
                 if not config.waypoint_vnav:
                     ui.write_message("Waypoint vertical detection disabled")
@@ -273,6 +274,7 @@ def main(stdscr):
                 ui.write_message(str(e))
                 sm = None
     if srm is not None and sm is not None:
+        srm.unpause()
         srm.stop_acceleration()
         sleep(1)
         srm.say_sim_rate()

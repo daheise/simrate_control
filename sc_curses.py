@@ -11,6 +11,7 @@ class CursesCommands(Enum):
     QUIT = auto()
     TOGGLE_ACCEL = auto()
     TOGGLE_WAYPOINTS = auto()
+    UNPAUSE = auto()
     NORMAL = auto()
 
 
@@ -167,4 +168,6 @@ Messages:
             return CursesCommands.TOGGLE_ACCEL
         elif k == ord("w"):
             return CursesCommands.TOGGLE_WAYPOINTS
+        elif k == ord("r"):
+            return CursesCommands.UNPAUSE
         return CursesCommands.NORMAL

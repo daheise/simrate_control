@@ -94,3 +94,6 @@ class SimrateControlConfig:
             self.waypoint_minimum_agl = int(
                 self._config["metrics"]["waypoint_minimum_agl"]
             )
+
+            if self.pause_at_tod:
+                self.waypoint_vnav = False

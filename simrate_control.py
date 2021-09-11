@@ -44,6 +44,7 @@ class SimRateManager:
         self.heading_select_bug = self.ae.find("HEADING_BUG_SELECT")
         self.set_barometer = self.ae.find("BAROMETRIC")
         self.ae_pause = self.ae.find("PAUSE_ON")
+        self.ae_pause_off = self.ae.find("PAUSE_OFF")
         self.tts_engine = pyttsx3.init()
 
     def _get_value(self, aq_name, retries=sys.maxsize):
@@ -80,7 +81,13 @@ class SimRateManager:
         """Pause the sim"""
         self.ae_pause()
         if self._config.annunciation:
-            self.tts_engine.say(f"Paused at todd")
+            self.tts_engine.say(f"Paused at tod")
+            self.tts_engine.runAndWait()
+
+    def unpause(self):
+        """Pause the sim"""
+        self.ae_pause_off()
+        if self._config.annunciation:
             self.tts_engine.runAndWait()
 
     def stop_acceleration(self):
@@ -235,6 +242,7 @@ def main(stdscr):
             try:
                 if user_input == CursesCommands.TOGGLE_ACCEL:
                     simrate_functions.reverse()
+                    srm.unpause()
                 if user_input == CursesCommands.TOGGLE_WAYPOINTS:
                     config.waypoint_vnav = not config.waypoint_vnav
 

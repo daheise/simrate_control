@@ -38,6 +38,7 @@ class SimrateControlConfig:
             )
             self.max_rate = float(self._config["simrate"]["max_rate"])
             self.min_rate = float(self._config["simrate"]["min_rate"])
+            self.cautious_rate = float(self._config["simrate"]["cautious_rate"])
 
             self.min_vsi = int(self._config["stability"]["min_vsi"])
             self.max_vsi = int(self._config["stability"]["max_vsi"])

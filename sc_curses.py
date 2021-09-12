@@ -11,8 +11,15 @@ class CursesCommands(Enum):
     QUIT = auto()
     TOGGLE_ACCEL = auto()
     TOGGLE_WAYPOINTS = auto()
+    PAUSE = auto()
     UNPAUSE = auto()
     NORMAL = auto()
+    MAX_SIMRATE_1 = auto()
+    MAX_SIMRATE_2 = auto()
+    MAX_SIMRATE_4 = auto()
+    MAX_SIMRATE_8 = auto()
+    MAX_SIMRATE_16 = auto()
+
 
 
 class ScCurses:
@@ -26,7 +33,7 @@ class ScCurses:
     def write_layout(self):
         # Clear screen
         layout = """Get-there-itis Simrate Control
-Sim Rate:                  Target Simrate:  
+Sim Rate (Current/Target/Max):       /       /
 AP Mode: 
 Pitch/Bank:     /          Max Pitch/Bank:     / 
 Alt:                       Ground Alt: 
@@ -60,10 +67,13 @@ Messages:
         self._screen.addstr(10, 22, f"{str(td)}")
 
     def write_simrate(self, rate: int) -> None:
-        self._screen.addstr(1, 10, f"{rate:.2f}x")
+        self._screen.addstr(1, 31, f"{rate:.2f}x")
 
     def write_target_simrate(self, rate: int) -> None:
-        self._screen.addstr(1, 43, f"{str(int(rate))}x")
+        self._screen.addstr(1, 39, f"{str(int(rate))}x")
+
+    def write_max_simrate(self, rate: int) -> None:
+        self._screen.addstr(1, 47, f"{str(int(rate))}x")
 
     def write_simconnect_status(self, status) -> None:
         self._screen.addstr(11, 46, f"{str(status)}")
@@ -170,4 +180,16 @@ Messages:
             return CursesCommands.TOGGLE_WAYPOINTS
         elif k == ord("r"):
             return CursesCommands.UNPAUSE
+        elif k == ord("0"):
+            return CursesCommands.PAUSE
+        elif k == ord("1"):
+            return CursesCommands.MAX_SIMRATE_1
+        elif k == ord("2"):
+            return CursesCommands.MAX_SIMRATE_2
+        elif k == ord("3"):
+            return CursesCommands.MAX_SIMRATE_4
+        elif k == ord("4"):
+            return CursesCommands.MAX_SIMRATE_8
+        elif k == ord("5"):
+            return CursesCommands.MAX_SIMRATE_16
         return CursesCommands.NORMAL

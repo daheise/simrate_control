@@ -35,7 +35,8 @@ ascent and approach) the minimum simrate will be selected (default 1x).
 
 It is suggested not to increase the maximum rate beyond 4x, as the autopilot has
 trouble maintain track and level flight. Decreasing the minimum simrate is also
-not recommended.
+not recommended. Default configuration parameters are optimatize for a 4x
+maximum simrate.
 
 ### Flight Plan
 

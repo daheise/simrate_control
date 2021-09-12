@@ -92,10 +92,16 @@ class FlightDataMetrics:
         next_alt = self.aq_next_wp_alt * 3.28084
         # If the next waypoint altitude is set to zero, try to approximate
         # setting the alt to the ground's
-        if "TIME" in self.aq_next_wp_ident and len(self.aq_next_wp_ident) > 5:
-            next_alt = max(self.get_ground_elevation() + self.aq_alt_indicated,
-            self.get_ground_elevation() + self._config.min_agl_cruise)
-        elif (
+        # Known phantoms:
+        # TIMECLI = Initial climb out of airport. Set to minimum cruise alt.
+        # TIMEVER = Seem to be related to arrival. Should be use ground
+        # elevation.
+        if "TIMECLI" in self.aq_next_wp_ident:
+            next_alt = self.get_ground_elevation() + self._config.min_agl_cruise
+        elif "TIMEVER" in self.aq_next_wp_ident:
+            next_alt = self.get_ground_elevation()
+
+        if (
             next_alt - self.get_ground_elevation()
         ) < self._config.waypoint_minimum_agl or not self._config.waypoint_vnav:
             next_alt = self.get_ground_elevation()
@@ -342,8 +348,8 @@ class SimrateDiscriminator:
             ground_speed = self.flight_params.aq_ground_speed  # units: meters/sec
             mps_to_nmps = 5.4e-4  # one meter per second to 1 nautical mile per second
             nautical_miles_per_second = ground_speed * mps_to_nmps
-            previous_dist = nautical_miles_per_second * self._config.waypoint_buffer
-            next_dist = nautical_miles_per_second * self._config.waypoint_buffer
+            previous_dist = nautical_miles_per_second * self._config.waypoint_buffer * self._config.max_rate
+            next_dist = nautical_miles_per_second * self._config.waypoint_buffer * self._config.max_rate
             clearance = self.flight_params.get_waypoint_distances()
 
             if clearance.prev > previous_dist and clearance.next > next_dist:
@@ -404,7 +410,7 @@ class SimrateDiscriminator:
                 return False
 
             if (
-                self.flight_params.time_to_flc() < self._config.descent_safety_factor
+                self.flight_params.time_to_flc() < self._config.descent_safety_factor * self._config.max_rate
                 and self.flight_params.target_altitude_change() != 0
             ):
                 return True

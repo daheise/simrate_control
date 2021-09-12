@@ -77,6 +77,7 @@ class FlightDataMetrics:
         )
 
         ident = self._get_value("GPS_WP_NEXT_ID").decode("utf-8")
+        self.aq_next_wp_ident = ident
         self.aq_next_wp_ident = (
             ident
             if (
@@ -91,7 +92,10 @@ class FlightDataMetrics:
         next_alt = self.aq_next_wp_alt * 3.28084
         # If the next waypoint altitude is set to zero, try to approximate
         # setting the alt to the ground's
-        if (
+        if "TIME" in self.aq_next_wp_ident and len(self.aq_next_wp_ident) > 5:
+            next_alt = max(self.get_ground_elevation() + self.aq_alt_indicated,
+            self.get_ground_elevation() + self._config.min_agl_cruise)
+        elif (
             next_alt - self.get_ground_elevation()
         ) < self._config.waypoint_minimum_agl or not self._config.waypoint_vnav:
             next_alt = self.get_ground_elevation()

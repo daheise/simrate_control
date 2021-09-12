@@ -3,7 +3,7 @@ from SimConnect import *
 from geopy import distance
 from collections import namedtuple
 from sys import maxsize
-from math import radians, degrees, ceil, tan, sin, asin, floor, log2
+from math import radians, degrees, tan, sin, cos, asin, atan2
 from time import sleep
 
 
@@ -131,6 +131,27 @@ class FlightDataMetrics:
             raise SimConnectDataError()
         except TypeError:
             raise SimConnectDataError()
+
+    def _get_bearing(self, lat1, lon1, lat2, lon2):
+        dLon = lon2 - lon1
+        y = sin(dLon) * cos(lat2)
+        x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(dLon)
+        brng = degrees(atan2(y, x))
+        brng = (brng + 360) % 360
+        return brng
+
+    def get_waypoint_directions(self):
+        prev_wp_lat = radians(self.aq_prev_wp_lat)
+        prev_wp_lon = radians(self.aq_prev_wp_lon)
+        cur_lat = radians(self.aq_cur_lat)
+        cur_long = radians(self.aq_cur_long)
+        next_wp_lat = radians(self.aq_next_wp_lat)
+        next_wp_lon = radians(self.aq_next_wp_lon)
+
+        brng_prev = self._get_bearing(cur_lat, cur_long, prev_wp_lat, prev_wp_lon)
+        brng_next = self._get_bearing(cur_lat, cur_long, next_wp_lat, next_wp_lon)
+
+        return (brng_prev, brng_next)
 
     def ground_speed(self):
         # Convert m/s to nm/s

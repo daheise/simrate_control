@@ -38,7 +38,7 @@ AP Mode:
 Pitch/Bank:     /          Max Pitch/Bank:     / 
 Alt:                       Ground Alt: 
 Waypoint:                  G. Speed: 
-Waypoint Dist:             FLC:                / 
+WP Loc:           /        FLC:                /
 Waypoint Alt:              Target VS/Slope:         / 
 VS:                        Needed VS: 
 AGL:                       Min AGL: 
@@ -107,7 +107,10 @@ Messages:
         self._screen.addstr(5, 37, f"{str(int(speed))}kts")
 
     def write_waypoint_distance(self, dist: float):
-        self._screen.addstr(6, 15, f"{dist:.2f}nm")
+        self._screen.addstr(6, 8, f"{dist:.1f}nm")
+
+    def write_waypoint_direction(self, dir: float):
+        self._screen.addstr(6, 20, f"{int(dir)}°")
 
     def write_tod_time(self, seconds, simrate=1):
         seconds /= simrate

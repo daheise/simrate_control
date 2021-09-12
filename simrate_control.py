@@ -173,6 +173,9 @@ def write_screen(
     sc_curses.write_waypoint_distance(
         flight_data_parameters.get_waypoint_distances().next
     )
+    sc_curses.write_waypoint_direction(
+        flight_data_parameters.get_waypoint_directions()[1]
+    )
     sc_curses.write_waypoint_alt(flight_data_parameters.next_waypoint_altitude())
     sc_curses.write_target_vspeed(flight_data_parameters.target_fpm())
     sc_curses.write_target_slope(flight_data_parameters.choose_slope_angle())

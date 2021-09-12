@@ -348,8 +348,8 @@ class SimrateDiscriminator:
             ground_speed = self.flight_params.aq_ground_speed  # units: meters/sec
             mps_to_nmps = 5.4e-4  # one meter per second to 1 nautical mile per second
             nautical_miles_per_second = ground_speed * mps_to_nmps
-            previous_dist = nautical_miles_per_second * self._config.waypoint_buffer * self._config.max_rate
-            next_dist = nautical_miles_per_second * self._config.waypoint_buffer * self._config.max_rate
+            previous_dist = max(2, nautical_miles_per_second * (self._config.waypoint_buffer * self._config.cautious_rate))
+            next_dist = max(2, nautical_miles_per_second * self._config.waypoint_buffer * self._config.max_rate)
             clearance = self.flight_params.get_waypoint_distances()
 
             if clearance.prev > previous_dist and clearance.next > next_dist:

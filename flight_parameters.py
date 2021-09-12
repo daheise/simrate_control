@@ -3,7 +3,7 @@ from SimConnect import *
 from geopy import distance
 from collections import namedtuple
 from sys import maxsize
-from math import radians, degrees, ceil, tan, sin, asin, floor, log2
+from math import radians, degrees, tan, sin, cos, asin, atan2
 from time import sleep
 
 
@@ -77,6 +77,7 @@ class FlightDataMetrics:
         )
 
         ident = self._get_value("GPS_WP_NEXT_ID").decode("utf-8")
+        self.aq_next_wp_ident = ident
         self.aq_next_wp_ident = (
             ident
             if (
@@ -91,6 +92,15 @@ class FlightDataMetrics:
         next_alt = self.aq_next_wp_alt * 3.28084
         # If the next waypoint altitude is set to zero, try to approximate
         # setting the alt to the ground's
+        # Known phantoms:
+        # TIMECLI = Initial climb out of airport. Set to minimum cruise alt.
+        # TIMEVER = Seem to be related to arrival. Should be use ground
+        # elevation.
+        if "TIMECLI" in self.aq_next_wp_ident:
+            next_alt = self.get_ground_elevation() + self._config.min_agl_cruise
+        elif "TIMEVER" in self.aq_next_wp_ident:
+            next_alt = self.get_ground_elevation()
+
         if (
             next_alt - self.get_ground_elevation()
         ) < self._config.waypoint_minimum_agl or not self._config.waypoint_vnav:
@@ -131,6 +141,27 @@ class FlightDataMetrics:
             raise SimConnectDataError()
         except TypeError:
             raise SimConnectDataError()
+
+    def _get_bearing(self, lat1, lon1, lat2, lon2):
+        dLon = lon2 - lon1
+        y = sin(dLon) * cos(lat2)
+        x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(dLon)
+        brng = degrees(atan2(y, x))
+        brng = (brng + 360) % 360
+        return brng
+
+    def get_waypoint_directions(self):
+        prev_wp_lat = radians(self.aq_prev_wp_lat)
+        prev_wp_lon = radians(self.aq_prev_wp_lon)
+        cur_lat = radians(self.aq_cur_lat)
+        cur_long = radians(self.aq_cur_long)
+        next_wp_lat = radians(self.aq_next_wp_lat)
+        next_wp_lon = radians(self.aq_next_wp_lon)
+
+        brng_prev = self._get_bearing(cur_lat, cur_long, prev_wp_lat, prev_wp_lon)
+        brng_next = self._get_bearing(cur_lat, cur_long, next_wp_lat, next_wp_lon)
+
+        return (brng_prev, brng_next)
 
     def ground_speed(self):
         # Convert m/s to nm/s
@@ -317,8 +348,8 @@ class SimrateDiscriminator:
             ground_speed = self.flight_params.aq_ground_speed  # units: meters/sec
             mps_to_nmps = 5.4e-4  # one meter per second to 1 nautical mile per second
             nautical_miles_per_second = ground_speed * mps_to_nmps
-            previous_dist = nautical_miles_per_second * self._config.waypoint_buffer
-            next_dist = nautical_miles_per_second * self._config.waypoint_buffer
+            previous_dist = max(2, nautical_miles_per_second * (self._config.waypoint_buffer * self._config.cautious_rate))
+            next_dist = max(2, nautical_miles_per_second * self._config.waypoint_buffer * self._config.max_rate)
             clearance = self.flight_params.get_waypoint_distances()
 
             if clearance.prev > previous_dist and clearance.next > next_dist:
@@ -379,7 +410,7 @@ class SimrateDiscriminator:
                 return False
 
             if (
-                self.flight_params.time_to_flc() < self._config.descent_safety_factor
+                self.flight_params.time_to_flc() < self._config.descent_safety_factor * self._config.max_rate
                 and self.flight_params.target_altitude_change() != 0
             ):
                 return True

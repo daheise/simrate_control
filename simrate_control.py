@@ -81,13 +81,14 @@ class SimRateManager:
         """Pause the sim"""
         self.ae_pause()
         if self._config.annunciation:
-            self.tts_engine.say(f"Paused at tod")
+            self.tts_engine.say(f"Game paused at tod")
             self.tts_engine.runAndWait()
 
     def unpause(self):
         """Pause the sim"""
         self.ae_pause_off()
         if self._config.annunciation:
+            self.tts_engine.say(f"Game unpaused")
             self.tts_engine.runAndWait()
 
     def stop_acceleration(self):
@@ -107,11 +108,13 @@ class SimRateManager:
             return
         if simrate > self._config.min_rate:
             self.decrease_sim_rate()
-            self.set_barometer()
+            if self._config.set_barometer:
+                self.set_barometer()
             self.heading_select_bug()
         elif simrate < self._config.min_rate:
             self.increase_sim_rate()
-            self.set_barometer()
+            if self._config.set_barometer:
+                self.set_barometer()
             self.heading_select_bug()
 
     def accelerate(self):
@@ -121,11 +124,13 @@ class SimRateManager:
             return
         if simrate < self._config.max_rate:
             self.increase_sim_rate()
-            self.set_barometer()
+            if self._config.set_barometer:
+                self.set_barometer()
             self.heading_select_bug()
         elif simrate > self._config.max_rate:
             self.decrease_sim_rate()
-            self.set_barometer()
+            if self._config.set_barometer:
+                self.set_barometer()
             self.heading_select_bug()
 
     def update(self, max_stable_rate):
@@ -159,6 +164,7 @@ def write_screen(
 ):
     sc_curses.write_simrate(simrate_manager.get_sim_rate())
     sc_curses.write_target_simrate(simrate_discriminator.get_max_sim_rate())
+    sc_curses.write_max_simrate(config.max_rate)
     sc_curses.write_bank(degrees(flight_data_parameters.aq_bank))
     sc_curses.write_pitch(degrees(flight_data_parameters.aq_pitch))
     sc_curses.write_ground_speed(flight_data_parameters.ground_speed() * 3600)
@@ -166,6 +172,9 @@ def write_screen(
     sc_curses.write_ground_alt(flight_data_parameters.get_ground_elevation())
     sc_curses.write_waypoint_distance(
         flight_data_parameters.get_waypoint_distances().next
+    )
+    sc_curses.write_waypoint_direction(
+        flight_data_parameters.get_waypoint_directions()[1]
     )
     sc_curses.write_waypoint_alt(flight_data_parameters.next_waypoint_altitude())
     sc_curses.write_target_vspeed(flight_data_parameters.target_fpm())
@@ -246,6 +255,18 @@ def main(stdscr):
                     config.waypoint_vnav = not config.waypoint_vnav
                 if user_input == CursesCommands.UNPAUSE:
                     srm.unpause()
+                if user_input == CursesCommands.PAUSE:
+                    srm.pause()
+                if user_input == CursesCommands.MAX_SIMRATE_1:
+                    config.max_rate = 1
+                if user_input == CursesCommands.MAX_SIMRATE_2:
+                    config.max_rate = 2
+                if user_input == CursesCommands.MAX_SIMRATE_4:
+                    config.max_rate = 4
+                if user_input == CursesCommands.MAX_SIMRATE_8:
+                    config.max_rate = 8
+                if user_input == CursesCommands.MAX_SIMRATE_16:
+                    config.max_rate = 16
 
                 if not config.waypoint_vnav:
                     ui.write_message("Waypoint vertical detection disabled")

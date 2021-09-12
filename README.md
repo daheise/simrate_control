@@ -110,7 +110,7 @@ only trigger once per start up of Simrate Control.
 * Press 'r' to resume after a pause at TOD.
 * Press 'q' or 'Ctrl + C' to set simrate to the minimum and exit.
 * Press '0' to pause the game. `r` to unpause, as above.
-* Press top row number keys '1-5' to adjust maximum sim rate to 1x, 2x, 4x, 8x,
+* Press number keys '1-5' to adjust maximum sim rate to 1x, 2x, 4x, 8x,
   16x respectively.
 
 NOTE: Key presses do not take effect until the next screen update, so there may

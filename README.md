@@ -8,8 +8,8 @@ accelerating. Violations will generally lead to sim rate being set to 1x,
 although some conditions will only reduce to 2x, e.g. being close to a waypoint,
 gentle ascents/descents.
 
-The window provides a number of data outputs that may be useful for acheiving
-maximum acceleration. It also has the convience feature up updating your
+The window provides a number of data outputs that may be useful for achieving
+maximum acceleration. It also has the convenience feature up updating your
 barometer setting at every simrate change. The UI is unstable at this time, both
 in content and location of information.
 
@@ -35,8 +35,8 @@ ascent and approach) the minimum simrate will be selected (default 1x).
 
 It is suggested not to increase the maximum rate beyond 4x, as the autopilot has
 trouble maintain track and level flight. Decreasing the minimum simrate is also
-not recommended. Default configuration parameters are optimatize for a 4x
-maximum simrate.
+not recommended. Default configuration parameters are optimized for a 4x maximum
+simrate.
 
 ### Flight Plan
 
@@ -130,10 +130,10 @@ pyinstaller .\simrate_control.spec
 
 ## Known Issues
 
-* A flight plan must have at least one waypoint between departure and
-  destination, otherwise the waypoints do not progress correctly.
+* MSFS inserts "phantom waypoints" that must be flown near to advance the flight
+  plan as seen by the controller. They have names like TIMECLI and TIMEVER.
 * This utility is only tested extensively with default planes. Mods and third
-  party planes often do not have the simvars this utilty relies on, and may
+  party planes often do not have the simvars this utility relies on, and may
   behave in unexpected ways or not at all. For example, the FlyByWire A320NX
   does not work at all, because it uses a multitude of custom simvars. The
   Working Title mods can also cause inconsistent behavior due to issues with
@@ -149,7 +149,7 @@ pyinstaller .\simrate_control.spec
   selection I could come up with that would get the active selection off of
   simrate.
 
-Tested on: MSFS 2020 1.18.15.0
+Tested on: MSFS 2020 at least version 1.19.8.0
 
 ### Acknowledgements
 

@@ -61,7 +61,8 @@ class WeightManager:
     
     @property
     def random_weight(self):
-        minimum_weight = random.gauss(170, 25)
+        # Minimum weight is at least one pilot
+        minimum_weight = random.triangular(120, 250, 150)
         low = minimum_weight
         high = self.maximum_payload
         total_payload = random.triangular(low, high)

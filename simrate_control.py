@@ -43,6 +43,7 @@ class SimRateManager:
         # TODO: Figure out something better.
         self.heading_select_bug = self.ae.find("HEADING_BUG_SELECT")
         self.set_barometer = self.ae.find("BAROMETRIC")
+        self.set_mixture = self.ae.find("MIXTURE_SET_BEST")
         self.ae_pause = self.ae.find("PAUSE_ON")
         self.ae_pause_off = self.ae.find("PAUSE_OFF")
         self.tts_engine = pyttsx3.init()
@@ -110,11 +111,15 @@ class SimRateManager:
             self.decrease_sim_rate()
             if self._config.set_barometer:
                 self.set_barometer()
+            if self._config.set_mixture:
+                self.set_mixture()
             self.heading_select_bug()
         elif simrate < self._config.min_rate:
             self.increase_sim_rate()
             if self._config.set_barometer:
                 self.set_barometer()
+            if self._config.set_mixture:
+                self.set_mixture()
             self.heading_select_bug()
 
     def accelerate(self):
@@ -126,11 +131,15 @@ class SimRateManager:
             self.increase_sim_rate()
             if self._config.set_barometer:
                 self.set_barometer()
+            if self._config.set_mixture:
+                self.set_mixture()
             self.heading_select_bug()
         elif simrate > self._config.max_rate:
             self.decrease_sim_rate()
             if self._config.set_barometer:
                 self.set_barometer()
+            if self._config.set_mixture:
+                self.set_mixture()
             self.heading_select_bug()
 
     def update(self, max_stable_rate):

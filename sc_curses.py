@@ -21,7 +21,6 @@ class CursesCommands(Enum):
     MAX_SIMRATE_16 = auto()
 
 
-
 class ScCurses:
     def __init__(self, screen) -> None:
         self._screen = screen

@@ -111,6 +111,9 @@ class FlightDataMetrics:
         # return self.aq_alt_indicated - self.aq_agl
         return self.aq_ground_elevation * 3.28084
 
+    def get_destination_distance(self):
+        return self.ground_speed() * self.aq_ete
+
     def get_waypoint_distances(self):
         """Get the distance to the previous and next FPL waypoints."""
         try:
@@ -127,20 +130,22 @@ class FlightDataMetrics:
             next_clearance = distance.distance(
                 (next_wp_lat, next_wp_lon), (cur_lat, cur_long)
             ).nm
-            if (
-                self.next_waypoint_altitude()
-                <= (self.get_ground_elevation() + self._config.waypoint_minimum_agl)
-                or not self._config.waypoint_vnav
-            ):
-                return WaypointClearance(
-                    prev_clearance, self.ground_speed() * self.aq_ete
-                )
-            else:
-                return WaypointClearance(prev_clearance, next_clearance)
+
+            return WaypointClearance(prev_clearance, next_clearance)
         except ValueError:
             raise SimConnectDataError()
         except TypeError:
             raise SimConnectDataError()
+
+    def get_vnav_distance(self):
+        if (
+            self.next_waypoint_altitude()
+            <= (self.get_ground_elevation() + self._config.waypoint_minimum_agl)
+            or not self._config.waypoint_vnav
+        ):
+            return self.ground_speed() * self.aq_ete
+        else:
+            return self.get_waypoint_distances().next
 
     def _get_bearing(self, lat1, lon1, lat2, lon2):
         dLon = lon2 - lon1
@@ -188,7 +193,7 @@ class FlightDataMetrics:
         ground_speed = self.ground_speed() * 60 * 6076.118
         # rough calculation. I have also seen (ground_speed(knots)/2)*10
         # convert nm to feet
-        waypoint_distance = self.get_waypoint_distances().next * 6076.118
+        waypoint_distance = self.get_vnav_distance() * 6076.118
         fpm = 0
         try:
             fpm = ground_speed * asin(self.target_altitude_change() / waypoint_distance)
@@ -198,16 +203,16 @@ class FlightDataMetrics:
 
     def distance_to_flc(self):
         if self.target_altitude_change() == 0:
-            return self.get_waypoint_distances().next
+            return self.get_vnav_distance()
 
-        return self.get_waypoint_distances().next - self.flc_length()
+        return self.get_vnav_distance() - self.flc_length()
 
     def time_to_flc(self):
         gspeed = self.ground_speed()
         if gspeed == 0:
             return 0
         if self.target_altitude_change() == 0:
-            return self.get_waypoint_distances().next / gspeed
+            return self.get_vnav_distance() / gspeed
         seconds = self.distance_to_flc() / gspeed
         return seconds if seconds > 0 else 0
 
@@ -348,8 +353,18 @@ class SimrateDiscriminator:
             ground_speed = self.flight_params.aq_ground_speed  # units: meters/sec
             mps_to_nmps = 5.4e-4  # one meter per second to 1 nautical mile per second
             nautical_miles_per_second = ground_speed * mps_to_nmps
-            previous_dist = max(2, nautical_miles_per_second * (self._config.waypoint_buffer * self._config.cautious_rate))
-            next_dist = max(2, nautical_miles_per_second * self._config.waypoint_buffer * self._config.max_rate)
+            previous_dist = max(
+                2,
+                nautical_miles_per_second
+                * self._config.waypoint_buffer
+                * self._config.cautious_rate,
+            )
+            next_dist = max(
+                2,
+                nautical_miles_per_second
+                * self._config.waypoint_buffer
+                * self._config.max_rate,
+            )
             clearance = self.flight_params.get_waypoint_distances()
 
             if clearance.prev > previous_dist and clearance.next > next_dist:
@@ -410,7 +425,8 @@ class SimrateDiscriminator:
                 return False
 
             if (
-                self.flight_params.time_to_flc() < self._config.descent_safety_factor * self._config.max_rate
+                self.flight_params.time_to_flc()
+                < self._config.descent_safety_factor * self._config.max_rate
                 and self.flight_params.target_altitude_change() != 0
             ):
                 return True

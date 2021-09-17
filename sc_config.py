@@ -40,6 +40,7 @@ class SimrateControlConfig:
             self.min_rate = float(self._config["simrate"]["min_rate"])
             self.cautious_rate = float(self._config["simrate"]["cautious_rate"])
             self.set_barometer = self._config.getboolean("simrate", "set_barometer")
+            self.set_mixture = self._config.getboolean("simrate", "set_mixture")
 
             self.min_vsi = int(self._config["stability"]["min_vsi"])
             self.max_vsi = int(self._config["stability"]["max_vsi"])

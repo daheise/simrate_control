@@ -130,8 +130,9 @@ pyinstaller .\simrate_control.spec
 
 ## Known Issues
 
-* MSFS inserts "phantom waypoints" that must be flown near to advance the flight
-  plan as seen by the controller. They have names like TIMECLI and TIMEVER.
+* MSFS inserts "phantom waypoints" into VFR flight plans must be flown near to
+  advance the flight plan as seen by the controller. They have names like
+  TIMECLI and TIMEVER. A workaround is to file the flight plan IFR.
 * This utility is only tested extensively with default planes. Mods and third
   party planes often do not have the simvars this utility relies on, and may
   behave in unexpected ways or not at all. For example, the FlyByWire A320NX

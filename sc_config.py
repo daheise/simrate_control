@@ -49,6 +49,9 @@ class SimrateControlConfig:
             self.waypoint_buffer = int(
                 self._config["stability"]["waypoint_buffer"]
             )  # seconds
+            self.minimum_waypoint_distance = float(
+                self._config["stability"]["minimum_waypoint_distance"]
+            )  # nm
             self.min_agl_cruise = int(self._config["stability"]["min_agl_cruise"])  # ft
 
             # These values relate to approach detection

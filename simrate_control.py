@@ -266,6 +266,8 @@ def main(stdscr):
                     srm.unpause()
                 if user_input == CursesCommands.PAUSE:
                     srm.pause()
+                if user_input == CursesCommands.TOGGLE_LNAV_GUARD:
+                    config.ap_nav_guarded = not config.ap_nav_guarded
                 if user_input == CursesCommands.MAX_SIMRATE_1:
                     config.max_rate = 1
                 if user_input == CursesCommands.MAX_SIMRATE_2:

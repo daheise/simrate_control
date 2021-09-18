@@ -14,6 +14,7 @@ class CursesCommands(Enum):
     PAUSE = auto()
     UNPAUSE = auto()
     NORMAL = auto()
+    TOGGLE_LNAV_GUARD = auto()
     MAX_SIMRATE_1 = auto()
     MAX_SIMRATE_2 = auto()
     MAX_SIMRATE_4 = auto()
@@ -180,6 +181,8 @@ Messages:
             return CursesCommands.TOGGLE_ACCEL
         elif k == ord("w"):
             return CursesCommands.TOGGLE_WAYPOINTS
+        elif k == ord("l"):
+            return CursesCommands.TOGGLE_LNAV_GUARD
         elif k == ord("r"):
             return CursesCommands.UNPAUSE
         elif k == ord("0"):

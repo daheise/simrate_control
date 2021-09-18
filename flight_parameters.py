@@ -3,7 +3,7 @@ from SimConnect import *
 from geopy import distance
 from collections import namedtuple
 from sys import maxsize
-from math import radians, degrees, tan, sin, cos, asin, atan2
+from math import ceil, radians, degrees, tan, sin, cos, asin, atan2
 from time import sleep
 
 
@@ -354,13 +354,13 @@ class SimrateDiscriminator:
             mps_to_nmps = 5.4e-4  # one meter per second to 1 nautical mile per second
             nautical_miles_per_second = ground_speed * mps_to_nmps
             previous_dist = max(
-                2,
-                nautical_miles_per_second
+                self._config.minimum_waypoint_distance,
+                ceil(nautical_miles_per_second
                 * self._config.waypoint_buffer
-                * self._config.cautious_rate,
+                * self._config.cautious_rate),
             )
             next_dist = max(
-                2,
+                self._config.minimum_waypoint_distance,
                 nautical_miles_per_second
                 * self._config.waypoint_buffer
                 * self._config.max_rate,

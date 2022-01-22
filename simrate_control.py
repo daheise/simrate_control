@@ -1,5 +1,6 @@
 from sc_config import SimrateControlConfig
 from sc_curses import ScCurses, CursesCommands
+from lib.koseng.simconnect_mobiflight import SimConnectMobiFlight
 from flight_parameters import (
     FlightDataMetrics,
     SimrateDiscriminator,
@@ -214,7 +215,7 @@ def connect(retries=999):
     while not connected and i <= retries:
         i += 1
         try:
-            sm = SimConnect()
+            sm = SimConnectMobiFlight() #SimConnect()
             connected = True
         except KeyboardInterrupt:
             quit()
@@ -260,7 +261,7 @@ def main(stdscr):
             try:
                 if user_input == CursesCommands.TOGGLE_ACCEL:
                     simrate_functions.reverse()
-                if user_input == CursesCommands.TOGGLE_WAYPOINTS:
+                if user_input == CursesCommands.TOGGLE_VNAV_GUARD:
                     config.waypoint_vnav = not config.waypoint_vnav
                 if user_input == CursesCommands.UNPAUSE:
                     srm.unpause()
@@ -268,6 +269,8 @@ def main(stdscr):
                     srm.pause()
                 if user_input == CursesCommands.TOGGLE_LNAV_GUARD:
                     config.ap_nav_guarded = not config.ap_nav_guarded
+                if user_input == CursesCommands.TOGGLE_ETE_GUARD:
+                    config.ete_guard = not config.ete_guard
                 if user_input == CursesCommands.MAX_SIMRATE_1:
                     config.max_rate = 1
                 if user_input == CursesCommands.MAX_SIMRATE_2:

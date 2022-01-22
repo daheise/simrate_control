@@ -10,11 +10,12 @@ from typing import OrderedDict
 class CursesCommands(Enum):
     QUIT = auto()
     TOGGLE_ACCEL = auto()
-    TOGGLE_WAYPOINTS = auto()
+    TOGGLE_VNAV_GUARD = auto()
     PAUSE = auto()
     UNPAUSE = auto()
     NORMAL = auto()
     TOGGLE_LNAV_GUARD = auto()
+    TOGGLE_ETE_GUARD = auto()
     MAX_SIMRATE_1 = auto()
     MAX_SIMRATE_2 = auto()
     MAX_SIMRATE_4 = auto()
@@ -180,7 +181,7 @@ Messages:
         elif k == ord("p"):
             return CursesCommands.TOGGLE_ACCEL
         elif k == ord("w"):
-            return CursesCommands.TOGGLE_WAYPOINTS
+            return CursesCommands.TOGGLE_VNAV_GUARD
         elif k == ord("l"):
             return CursesCommands.TOGGLE_LNAV_GUARD
         elif k == ord("r"):

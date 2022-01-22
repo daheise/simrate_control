@@ -107,9 +107,10 @@ class FlightDataMetrics:
         # works at all fight now.
         if ("Airbus A320 Neo FlyByWire" in self.aq_title or
             "Airbus A320neo FlyByWire"  in self.aq_title):
-            self.aq_ap_master = bool(self.vr.get("(L:A32NX_AUTOPILOT_1_ACTIVE)") + self.vr.get("(L:A32NX_AUTOPILOT_1_ACTIVE)"))
+            self.aq_ap_master = bool(self.vr.get("(L:A32NX_AUTOPILOT_1_ACTIVE)") + self.vr.get("(L:A32NX_AUTOPILOT_2_ACTIVE)"))
             self.aq_nav_mode = bool(self.vr.get("(L:A32NX_FCU_HDG_MANAGED_DASHES)") + self.vr.get("(L:A32NX_FCU_HDG_MANAGED_DOT)"))
-        if ("Cessna CJ4 Citation Asobo" in self.aq_title):
+        if ("Cessna CJ4 Citation Asobo" in self.aq_title or
+            'Boeing 747-8i Asobo' in self.aq_title):
             wt_lnav = self.vr.get("(L:WT_CJ4_NAV_ON, Bool)")
             self.aq_nav_mode = bool(self.aq_nav_mode + wt_lnav)
             pass

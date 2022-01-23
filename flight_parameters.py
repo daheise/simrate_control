@@ -50,9 +50,17 @@ class FlightDataMetrics:
     @property
     def ete(self):
         ete1 = self._get_value("GPS_ETE")
-        #ete2 = self.get_waypoint_distances().next / self.ground_speed()
-        #ete = max(ete1, ete2)
-        return ete1
+        # ete2 is a workaround for the WT avionics framework ETE.
+        # See issue #40
+        ete2 = 0
+
+        distance = self.vr.get("(L:WT1000_LNav_Destination_Dis)") / 1852
+        gspeed = self.ground_speed()
+        if distance > 0 and gspeed > 0:
+            # meters to nmi
+            ete2 = distance / gspeed
+        ete = max(ete1, ete2)
+        return ete
 
 
     def update(self, retries=maxsize):
@@ -113,7 +121,6 @@ class FlightDataMetrics:
             'Boeing 747-8i Asobo' in self.aq_title):
             wt_lnav = self.vr.get("(L:WT_CJ4_NAV_ON, Bool)")
             self.aq_nav_mode = bool(self.aq_nav_mode + wt_lnav)
-            pass
 
     def next_waypoint_altitude(self):
         next_alt = self.aq_next_wp_alt * 3.28084

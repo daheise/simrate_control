@@ -529,8 +529,7 @@ class SimrateDiscriminator:
 
     def is_cruise_lights(self):
         lights= (not self.flight_params.aq_landing_lights
-        and not self.flight_params.aq_taxi_lights
-        and self.flight_params.aq_beacon_lights)
+        and not self.flight_params.aq_taxi_lights)
         if not lights:
             self.messages.append("Lights not configured for cruise")
         return lights

@@ -215,7 +215,7 @@ def connect(retries=999):
     while not connected and i <= retries:
         i += 1
         try:
-            sm = SimConnectMobiFlight() #SimConnect()
+            sm = SimConnectMobiFlight()  # SimConnect()
             connected = True
         except KeyboardInterrupt:
             quit()

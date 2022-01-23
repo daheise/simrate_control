@@ -1,5 +1,6 @@
 from sc_config import SimrateControlConfig
-#from lib.simconnect_mobiflight import SimConnectMobiFlight
+
+# from lib.simconnect_mobiflight import SimConnectMobiFlight
 from lib.koseng.mobiflight_variable_requests import MobiFlightVariableRequests
 from SimConnect import *
 from geopy import distance
@@ -50,18 +51,18 @@ class FlightDataMetrics:
     @property
     def ete(self):
         ete1 = self._get_value("GPS_ETE")
+
         # ete2 is a workaround for the WT avionics framework ETE.
         # See issue #40
         ete2 = 0
-
         distance = self.vr.get("(L:WT1000_LNav_Destination_Dis)") / 1852
         gspeed = self.ground_speed()
         if distance > 0 and gspeed > 0:
             # meters to nmi
             ete2 = distance / gspeed
+
         ete = max(ete1, ete2)
         return ete
-
 
     def update(self, retries=maxsize):
         # Load these all up for three reasons.
@@ -69,7 +70,7 @@ class FlightDataMetrics:
         # 2. Running them over and over may trigger a memory leak in the game
         # 3. It seems to increase reliability of reading/setting the data
         self.messages = []
-        self.aq_title = self._get_value("TITLE").decode('utf-8')
+        self.aq_title = self._get_value("TITLE").decode("utf-8")
         self.aq_prev_wp_lat = self._get_value("GPS_WP_PREV_LAT")
         self.aq_prev_wp_lon = self._get_value("GPS_WP_PREV_LON")
         self.aq_cur_lat = self._get_value("GPS_POSITION_LAT")
@@ -113,12 +114,22 @@ class FlightDataMetrics:
         self.aq_beacon_lights = self._get_value("LIGHT_BEACON")
         # Not the best way to handle special cases, but I'm just making sure it
         # works at all fight now.
-        if ("Airbus A320 Neo FlyByWire" in self.aq_title or
-            "Airbus A320neo FlyByWire"  in self.aq_title):
-            self.aq_ap_master = bool(self.vr.get("(L:A32NX_AUTOPILOT_1_ACTIVE)") + self.vr.get("(L:A32NX_AUTOPILOT_2_ACTIVE)"))
-            self.aq_nav_mode = bool(self.vr.get("(L:A32NX_FCU_HDG_MANAGED_DASHES)") + self.vr.get("(L:A32NX_FCU_HDG_MANAGED_DOT)"))
-        if ("Cessna CJ4 Citation Asobo" in self.aq_title or
-            'Boeing 747-8i Asobo' in self.aq_title):
+        if (
+            "Airbus A320 Neo FlyByWire" in self.aq_title
+            or "Airbus A320neo FlyByWire" in self.aq_title
+        ):
+            self.aq_ap_master = bool(
+                self.vr.get("(L:A32NX_AUTOPILOT_1_ACTIVE)")
+                + self.vr.get("(L:A32NX_AUTOPILOT_2_ACTIVE)")
+            )
+            self.aq_nav_mode = bool(
+                self.vr.get("(L:A32NX_FCU_HDG_MANAGED_DASHES)")
+                + self.vr.get("(L:A32NX_FCU_HDG_MANAGED_DOT)")
+            )
+        if (
+            "Cessna CJ4 Citation Asobo" in self.aq_title
+            or "Boeing 747-8i Asobo" in self.aq_title
+        ):
             wt_lnav = self.vr.get("(L:WT_CJ4_NAV_ON, Bool)")
             self.aq_nav_mode = bool(self.aq_nav_mode + wt_lnav)
 
@@ -250,7 +261,7 @@ class FlightDataMetrics:
         seconds = self.distance_to_flc() / gspeed
         return seconds if seconds > 0 else 0
 
-    def flc_length(self, change = None):
+    def flc_length(self, change=None):
         # distance in nm
         # https://www.thinkaviation.net/top-of-descent-calculation/
         angle = self.choose_slope_angle()
@@ -391,9 +402,11 @@ class SimrateDiscriminator:
             nautical_miles_per_second = ground_speed * mps_to_nmps
             previous_dist = max(
                 self._config.minimum_waypoint_distance,
-                ceil(nautical_miles_per_second
-                * self._config.waypoint_buffer
-                * self._config.cautious_rate),
+                ceil(
+                    nautical_miles_per_second
+                    * self._config.waypoint_buffer
+                    * self._config.cautious_rate
+                ),
             )
             next_dist = max(
                 self._config.minimum_waypoint_distance,
@@ -528,8 +541,10 @@ class SimrateDiscriminator:
         return approaching
 
     def is_cruise_lights(self):
-        lights= (not self.flight_params.aq_landing_lights
-        and not self.flight_params.aq_taxi_lights)
+        lights = (
+            not self.flight_params.aq_landing_lights
+            and not self.flight_params.aq_taxi_lights
+        )
         if not lights:
             self.messages.append("Lights not configured for cruise")
         return lights
@@ -554,10 +569,8 @@ class SimrateDiscriminator:
                 if not self.is_ap_active():
                     stable = 1
                 elif (
-                    (not self.is_cruise_configured()
-                    or not self.is_cruise_lights())
-                    and self._config.check_cruise_configuration
-                ):
+                    not self.is_cruise_configured() or not self.is_cruise_lights()
+                ) and self._config.check_cruise_configuration:
                     stable = 1
                 elif self.is_flc_needed():
                     if self._config.pause_at_tod and not self.have_paused_at_tod:

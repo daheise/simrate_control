@@ -19,6 +19,17 @@ uses waypoint altitudes to determine some sim rate conditions.
 Specific cited values for condition detection are subject to change. Most have
 configuration options in the `config.ini`.
 
+## Dependencies
+
+### MobiFlight
+
+This utility depends on MobiFlight Event Module installed with the [MobiFlight
+Connector](https://www.mobiflight.com/en/download.html). Ensure the package
+`mobiflight-event-module` is installed in your community folder before running
+this utility. This dependency allows reading of L-vars needed for add-on
+aircraft, e.g. Working Title CJ4.
+
+![mobiflight-event-module installation](https://user-images.githubusercontent.com/5230957/151675415-4cb7d144-3301-43e5-b51a-7936cd29800f.png)
 
 ## Simrate Contraints
 
@@ -155,6 +166,11 @@ Tested on: MSFS 2020 at least version 1.19.8.0
 ### Acknowledgements
 
 Inspired by the [SimRateBandit](https://github.com/dga711/msfs-simratebandit).
+
+This project uses code from [Koseng /
+MSFSPythonSimConnectMobiFlightExtension
+](https://github.com/Koseng/MSFSPythonSimConnectMobiFlightExtension) released
+under the MIT License.
 
 ### Other scripts
 

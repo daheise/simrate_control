@@ -1,4 +1,7 @@
 from sc_config import SimrateControlConfig
+
+# from lib.simconnect_mobiflight import SimConnectMobiFlight
+from lib.koseng.mobiflight_variable_requests import MobiFlightVariableRequests
 from SimConnect import *
 from geopy import distance
 from collections import namedtuple
@@ -18,6 +21,8 @@ WaypointClearance = namedtuple("WaypointClearances", "prev next")
 class FlightDataMetrics:
     def __init__(self, simconnect_connection, config: SimrateControlConfig):
         self.sm = simconnect_connection
+        self.vr = MobiFlightVariableRequests(self.sm)
+        self.vr.clear_sim_variables()
         self._config = config
         self.aq = AircraftRequests(self.sm)
         self.messages = []
@@ -43,12 +48,29 @@ class FlightDataMetrics:
         self._request_sleep = max(self._min_request_sleep, self._request_sleep - 0.01)
         return val
 
+    @property
+    def ete(self):
+        ete1 = self._get_value("GPS_ETE")
+
+        # ete2 is a workaround for the WT avionics framework ETE.
+        # See issue #40
+        ete2 = 0
+        distance = self.vr.get("(L:WT1000_LNav_Destination_Dis)") / 1852
+        gspeed = self.ground_speed()
+        if distance > 0 and gspeed > 0:
+            # meters to nmi
+            ete2 = distance / gspeed
+
+        ete = max(ete1, ete2)
+        return ete
+
     def update(self, retries=maxsize):
         # Load these all up for three reasons.
         # 1. These are static items
         # 2. Running them over and over may trigger a memory leak in the game
         # 3. It seems to increase reliability of reading/setting the data
         self.messages = []
+        self.aq_title = self._get_value("TITLE").decode("utf-8")
         self.aq_prev_wp_lat = self._get_value("GPS_WP_PREV_LAT")
         self.aq_prev_wp_lon = self._get_value("GPS_WP_PREV_LON")
         self.aq_cur_lat = self._get_value("GPS_POSITION_LAT")
@@ -56,6 +78,19 @@ class FlightDataMetrics:
         self.aq_next_wp_lat = self._get_value("GPS_WP_NEXT_LAT")
         self.aq_next_wp_lon = self._get_value("GPS_WP_NEXT_LON")
         self.aq_next_wp_alt = self._get_value("GPS_WP_NEXT_ALT")
+        self.aq_ground_elevation = self._get_value("GROUND_ALTITUDE")
+        ident = self._get_value("GPS_WP_NEXT_ID").decode("utf-8")
+        self.aq_next_wp_ident = ident
+        self.aq_next_wp_ident = (
+            ident
+            if (
+                self.next_waypoint_altitude()
+                > (self.get_ground_elevation() + self._config.waypoint_minimum_agl)
+                and self._config.waypoint_vnav
+            )
+            else f"LAND ({ident})"
+        )
+
         self.aq_pitch = self._get_value("PLANE_PITCH_DEGREES")
         self.aq_bank = self._get_value("PLANE_BANK_DEGREES")
         self.aq_vsi = self._get_value("VERTICAL_SPEED")
@@ -68,25 +103,33 @@ class FlightDataMetrics:
         self.aq_heading_hold = self._get_value("AUTOPILOT_HEADING_LOCK")
         self.aq_approach_hold = self._get_value("AUTOPILOT_APPROACH_HOLD")
         self.aq_approach_active = self._get_value("GPS_IS_APPROACH_ACTIVE")
-        self.aq_ete = self._get_value("GPS_ETE")
         self.aq_ground_speed = self._get_value("GPS_GROUND_SPEED")
-        self.aq_ground_elevation = self._get_value("GROUND_ALTITUDE")
+        self.aq_ete = self.ete
         self.aq_flaps_percent = max(
             self._get_value("TRAILING_EDGE_FLAPS_LEFT_PERCENT"),
             self._get_value("TRAILING_EDGE_FLAPS_RIGHT_PERCENT"),
         )
-
-        ident = self._get_value("GPS_WP_NEXT_ID").decode("utf-8")
-        self.aq_next_wp_ident = ident
-        self.aq_next_wp_ident = (
-            ident
-            if (
-                self.next_waypoint_altitude()
-                > (self.get_ground_elevation() + self._config.waypoint_minimum_agl)
-                and self._config.waypoint_vnav
+        self.aq_landing_lights = self._get_value("LIGHT_LANDING")
+        # Not the best way to handle special cases, but I'm just making sure it
+        # works at all fight now.
+        if (
+            "Airbus A320 Neo FlyByWire" in self.aq_title
+            or "Airbus A320neo FlyByWire" in self.aq_title
+        ):
+            self.aq_ap_master = bool(
+                self.vr.get("(L:A32NX_AUTOPILOT_1_ACTIVE)")
+                + self.vr.get("(L:A32NX_AUTOPILOT_2_ACTIVE)")
             )
-            else f"LAND ({ident})"
-        )
+            self.aq_nav_mode = bool(
+                self.vr.get("(L:A32NX_FCU_HDG_MANAGED_DASHES)")
+                + self.vr.get("(L:A32NX_FCU_HDG_MANAGED_DOT)")
+            )
+        if (
+            "Cessna CJ4 Citation Asobo" in self.aq_title
+            or "Boeing 747-8i Asobo" in self.aq_title
+        ):
+            wt_lnav = self.vr.get("(L:WT_CJ4_NAV_ON, Bool)")
+            self.aq_nav_mode = bool(self.aq_nav_mode + wt_lnav)
 
     def next_waypoint_altitude(self):
         next_alt = self.aq_next_wp_alt * 3.28084
@@ -216,16 +259,18 @@ class FlightDataMetrics:
         seconds = self.distance_to_flc() / gspeed
         return seconds if seconds > 0 else 0
 
-    def flc_length(self):
+    def flc_length(self, change=None):
         # distance in nm
         # https://www.thinkaviation.net/top-of-descent-calculation/
         angle = self.choose_slope_angle()
-        total_descent = self.target_altitude_change()
+        if change is None:
+            change = self.target_altitude_change()
+
         feet_to_nm = 6076.118
         # Solve the triangle to get a chosen degree of of change
         angle = radians(angle)
-        distance = (total_descent / tan(angle)) / feet_to_nm
-        if abs(total_descent) < self._config.altitude_change_tolerance:
+        distance = (change / tan(angle)) / feet_to_nm
+        if abs(change) < self._config.altitude_change_tolerance:
             return 0
         return distance
 
@@ -355,9 +400,11 @@ class SimrateDiscriminator:
             nautical_miles_per_second = ground_speed * mps_to_nmps
             previous_dist = max(
                 self._config.minimum_waypoint_distance,
-                ceil(nautical_miles_per_second
-                * self._config.waypoint_buffer
-                * self._config.cautious_rate),
+                ceil(
+                    nautical_miles_per_second
+                    * self._config.waypoint_buffer
+                    * self._config.cautious_rate
+                ),
             )
             next_dist = max(
                 self._config.minimum_waypoint_distance,
@@ -391,7 +438,7 @@ class SimrateDiscriminator:
         return True
 
     def is_last_waypoint(self):
-        """Is the FMS tagerting the final waypoint?"""
+        """Is the FMS targeting the final waypoint?"""
         cur_waypoint_index = self.flight_params.aq_cur_waypoint_index
         num_waypoints = self.flight_params.aq_num_waypoints
         try:
@@ -468,7 +515,7 @@ class SimrateDiscriminator:
                 approaching = True
 
             seconds = self._config.min_approach_time * 60
-            if self.flight_params.aq_ete < seconds:
+            if self.flight_params.aq_ete < seconds and self._config.ete_guard:
                 self.messages.append(f"Less than {seconds/60} minutes from destination")
                 approaching = True
 
@@ -491,6 +538,14 @@ class SimrateDiscriminator:
 
         return approaching
 
+    def is_cruise_lights(self):
+        lights = (
+            not self.flight_params.aq_landing_lights
+        )
+        if not lights:
+            self.messages.append("Lights not configured for cruise")
+        return lights
+
     def is_cruise_configured(self):
         cruise_configured = True
         if self.flight_params.aq_flaps_percent > 0:
@@ -511,9 +566,8 @@ class SimrateDiscriminator:
                 if not self.is_ap_active():
                     stable = 1
                 elif (
-                    not self.is_cruise_configured()
-                    and self._config.check_cruise_configuration
-                ):
+                    not self.is_cruise_configured() or not self.is_cruise_lights()
+                ) and self._config.check_cruise_configuration:
                     stable = 1
                 elif self.is_flc_needed():
                     if self._config.pause_at_tod and not self.have_paused_at_tod:

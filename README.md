@@ -29,7 +29,7 @@ Connector](https://www.mobiflight.com/en/download.html). Ensure the package
 this utility. This dependency allows reading of L-vars needed for add-on
 aircraft, e.g. Working Title CJ4.
 
-![mobiflight-event-module installation](https://user-images.githubusercontent.com/5230957/151675280-c4be004d-edce-4720-9a31-8cd91169dcac.png)
+![mobiflight-event-module installation](https://user-images.githubusercontent.com/5230957/151675415-4cb7d144-3301-43e5-b51a-7936cd29800f.png)
 
 ## Simrate Contraints
 

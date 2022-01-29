@@ -110,8 +110,6 @@ class FlightDataMetrics:
             self._get_value("TRAILING_EDGE_FLAPS_RIGHT_PERCENT"),
         )
         self.aq_landing_lights = self._get_value("LIGHT_LANDING")
-        self.aq_taxi_lights = self._get_value("LIGHT_TAXI")
-        self.aq_beacon_lights = self._get_value("LIGHT_BEACON")
         # Not the best way to handle special cases, but I'm just making sure it
         # works at all fight now.
         if (
@@ -543,7 +541,6 @@ class SimrateDiscriminator:
     def is_cruise_lights(self):
         lights = (
             not self.flight_params.aq_landing_lights
-            and not self.flight_params.aq_taxi_lights
         )
         if not lights:
             self.messages.append("Lights not configured for cruise")

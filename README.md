@@ -146,10 +146,7 @@ pyinstaller .\simrate_control.spec
   TIMECLI and TIMEVER. A workaround is to file the flight plan IFR.
 * This utility is only tested extensively with default planes. Mods and third
   party planes often do not have the simvars this utility relies on, and may
-  behave in unexpected ways or not at all. For example, the FlyByWire A320NX
-  does not work at all, because it uses a multitude of custom simvars. The
-  Working Title mods can also cause inconsistent behavior due to issues with
-  flight plan synchronization.
+  behave in unexpected ways or not at all.
 * Some planes do not report LNAV being on/off. See config.ini
   `nav_mode_guarded`.
 * ATC will tell you to fly at altitudes not in your flight plan. If you follow
@@ -161,7 +158,7 @@ pyinstaller .\simrate_control.spec
   selection I could come up with that would get the active selection off of
   simrate.
 
-Tested on: MSFS 2020 at least version 1.19.8.0
+Tested on: MSFS 2020 at least version 1.21.18.0
 
 ### Acknowledgements
 

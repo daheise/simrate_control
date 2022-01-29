@@ -21,11 +21,15 @@ configuration options in the `config.ini`.
 
 ## Dependencies
 
+### MobiFlight
+
 This utility depends on MobiFlight Event Module installed with the [MobiFlight
 Connector](https://www.mobiflight.com/en/download.html). Ensure the package
 `mobiflight-event-module` is installed in your community folder before running
 this utility. This dependency allows reading of L-vars needed for add-on
 aircraft, e.g. Working Title CJ4.
+
+![mobiflight-event-module installation](https://user-images.githubusercontent.com/5230957/151675280-c4be004d-edce-4720-9a31-8cd91169dcac.png)
 
 ## Simrate Contraints
 

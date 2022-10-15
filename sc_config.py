@@ -42,17 +42,21 @@ class SimrateControlConfig:
             self.set_barometer = self._config.getboolean("simrate", "set_barometer")
             self.set_mixture = self._config.getboolean("simrate", "set_mixture")
 
-            self.min_vsi = int(self._config["stability"]["min_vsi"])
-            self.max_vsi = int(self._config["stability"]["max_vsi"])
-            self.max_bank = int(self._config["stability"]["max_bank"])
-            self.max_pitch = int(self._config["stability"]["max_pitch"])
+            self.min_vsi = int(float(self._config["stability"]["min_vsi"]))
+            self.max_vsi = int(float(self._config["stability"]["max_vsi"]))
+            self.max_bank = float(self._config["stability"]["max_bank"])
+            self.max_pitch = float(self._config["stability"]["max_pitch"])
             self.waypoint_buffer = int(
                 self._config["stability"]["waypoint_buffer"]
             )  # seconds
             self.minimum_waypoint_distance = float(
                 self._config["stability"]["minimum_waypoint_distance"]
             )  # nm
+            self.custom_waypoint_distance = float(
+                self._config["stability"]["custom_waypoint_distance"]
+            )  # nm
             self.min_agl_cruise = int(self._config["stability"]["min_agl_cruise"])  # ft
+            self.min_agl_protection = self._config["stability"].getboolean("min_agl_protection")
 
             # These values relate to approach detection
             self.min_agl_descent = int(

@@ -10,7 +10,7 @@ from SimConnect import *
 import sys, os
 import configparser
 from time import sleep
-from math import degrees, floor, log2
+from math import degrees
 
 import pyttsx3
 
@@ -48,16 +48,25 @@ class SimRateManager:
         self.ae_pause = self.ae.find("PAUSE_ON")
         self.ae_pause_off = self.ae.find("PAUSE_OFF")
         self.tts_engine = pyttsx3.init()
+        self._request_sleep = 0.04
+        self._max_request_sleep = 1.0
+        self._min_request_sleep = 0.04
 
     def _get_value(self, aq_name, retries=sys.maxsize):
         # PySimConnect seems to crash the sim if requests happen too fast.
-        sleep(0.05)
+        sleep(self._request_sleep)
         val = self.aq.find(str(aq_name)).value
         i = 0
         while val is None and i < retries:
-            sleep(min(1, 0.01 * (i + 1)))
-            val = self.aq.find(str(aq_name)).value
             i += 1
+            self._request_sleep = self._max_request_sleep #min(
+                #self._request_sleep + self._min_request_sleep * i, self._max_request_sleep
+            #)
+            sleep(self._request_sleep)
+            val = self.aq.find(str(aq_name)).value
+        if i > 0:
+            self.messages.append(f"Warning: Retried {aq_name} {i} times.")
+        self._request_sleep = max(self._min_request_sleep, self._request_sleep - 0.01)
         return val
 
     def get_sim_rate(self):
@@ -99,7 +108,7 @@ class SimRateManager:
         if simrate is None:
             return
         while simrate > self._config.min_rate:
-            sleep(2)
+            sleep(self._request_sleep)
             self.decelerate()
             simrate /= 2
 
@@ -157,7 +166,7 @@ class SimRateManager:
         elif max_stable_rate < prev_simrate:
             messages.append("decelerate")
             self.decelerate()
-        sleep(0.5)
+        sleep(self._request_sleep)
         new_simrate = self.get_sim_rate()
         if prev_simrate != new_simrate:
             self.say_sim_rate()
@@ -198,7 +207,7 @@ def write_screen(
     sc_curses.write_max_bank(config.max_bank)
     sc_curses.write_max_pitch(config.max_pitch)
     sc_curses.write_ap_mode(simrate_discriminator.is_ap_active())
-    sc_curses.write_min_agl(config.min_agl_cruise)
+    sc_curses.write_min_agl(flight_data_parameters.min_agl_cruise())
     sc_curses.write_agl(flight_data_parameters.aq_agl)
     sc_curses.write_alt(flight_data_parameters.aq_alt_indicated)
     sc_curses.write_ete(flight_data_parameters.aq_ete)
@@ -293,7 +302,7 @@ def main(stdscr):
                 write_screen(
                     ui, config, flight_data_metrics, flight_stability, srm, messages
                 )
-                sleep(0.01)
+                sleep(0.04)
             except (SimConnectDataError, AttributeError, TypeError) as e:
                 messages.append("DATA ERROR")
                 messages.append(str(e))

@@ -157,8 +157,12 @@ pyinstaller .\simrate_control.spec
   a simrate transition. Selecting the heading bug is the least problematic
   selection I could come up with that would get the active selection off of
   simrate.
+* The "set_mixture" feature sometimes cuts off fuel entirely.
+* Some planes (e.g. FBW A320) set their own maximum sim rate. To prevent
+  rubber banding, set the max sim rate for this utility at or below the
+  aircraft mandated ceiling (2x, in the case of the FBW A320).
 
-Tested on: MSFS 2020 at least version 1.21.18.0
+Tested on: MSFS 2020 at least version 1.27.21.0
 
 ### Acknowledgements
 

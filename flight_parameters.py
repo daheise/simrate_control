@@ -6,8 +6,9 @@ from SimConnect import *
 from geopy import distance
 from collections import namedtuple
 from sys import maxsize
-from math import ceil, radians, degrees, tan, sin, cos, asin, atan2
+from math import ceil, radians, degrees, tan, sin, cos, asin, atan2, log2
 from time import sleep
+from copy import copy
 
 
 class SimConnectDataError(Exception):
@@ -18,6 +19,10 @@ class SimConnectDataError(Exception):
 WaypointClearance = namedtuple("WaypointClearances", "prev next")
 
 
+def rate_steps(rate, safety_margin=1):
+    return max(ceil(log2(rate)), 0) + safety_margin
+
+
 class FlightDataMetrics:
     def __init__(self, simconnect_connection, config: SimrateControlConfig):
         self.sm = simconnect_connection
@@ -26,9 +31,10 @@ class FlightDataMetrics:
         self._config = config
         self.aq = AircraftRequests(self.sm)
         self.messages = []
-        self._request_sleep = 0.05
-        self._max_request_sleep = 0.5
-        self._min_request_sleep = 0.01
+        self._request_sleep = 0.04
+        self._max_request_sleep = 0.1
+        self._min_request_sleep = 0.04
+        self.first_waypoint = ""
         self.update()
 
     def _get_value(self, aq_name, retries=maxsize):
@@ -39,7 +45,8 @@ class FlightDataMetrics:
         while val is None and i < retries:
             i += 1
             self._request_sleep = min(
-                self._request_sleep + 0.05 * i, self._max_request_sleep
+                self._request_sleep + self._min_request_sleep * i,
+                self._max_request_sleep,
             )
             sleep(self._request_sleep)
             val = self.aq.find(str(aq_name)).value
@@ -71,15 +78,13 @@ class FlightDataMetrics:
         # 3. It seems to increase reliability of reading/setting the data
         self.messages = []
         self.aq_title = self._get_value("TITLE").decode("utf-8")
-        self.aq_prev_wp_lat = self._get_value("GPS_WP_PREV_LAT")
-        self.aq_prev_wp_lon = self._get_value("GPS_WP_PREV_LON")
-        self.aq_cur_lat = self._get_value("GPS_POSITION_LAT")
-        self.aq_cur_long = self._get_value("GPS_POSITION_LON")
-        self.aq_next_wp_lat = self._get_value("GPS_WP_NEXT_LAT")
-        self.aq_next_wp_lon = self._get_value("GPS_WP_NEXT_LON")
+        ident = self._get_value("GPS_WP_NEXT_ID").decode("utf-8")
+        prev_ident = self._get_value("GPS_WP_PREV_ID").decode("utf-8")
         self.aq_next_wp_alt = self._get_value("GPS_WP_NEXT_ALT")
         self.aq_ground_elevation = self._get_value("GROUND_ALTITUDE")
-        ident = self._get_value("GPS_WP_NEXT_ID").decode("utf-8")
+        if len(self.first_waypoint.replace("(LAND)", "").strip()) == 0:
+            self.first_waypoint = prev_ident
+        self.aq_prev_wp_ident =  ( prev_ident if not prev_ident.startswith("TIMECLI") else self.first_waypoint)
         self.aq_next_wp_ident = ident
         self.aq_next_wp_ident = (
             ident
@@ -88,9 +93,15 @@ class FlightDataMetrics:
                 > (self.get_ground_elevation() + self._config.waypoint_minimum_agl)
                 and self._config.waypoint_vnav
             )
-            else f"LAND ({ident})"
+            else f"{ident} (LAND)"
         )
 
+        self.aq_prev_wp_lat = self._get_value("GPS_WP_PREV_LAT")
+        self.aq_prev_wp_lon = self._get_value("GPS_WP_PREV_LON")
+        self.aq_cur_lat = self._get_value("GPS_POSITION_LAT")
+        self.aq_cur_long = self._get_value("GPS_POSITION_LON")
+        self.aq_next_wp_lat = self._get_value("GPS_WP_NEXT_LAT")
+        self.aq_next_wp_lon = self._get_value("GPS_WP_NEXT_LON")
         self.aq_pitch = self._get_value("PLANE_PITCH_DEGREES")
         self.aq_bank = self._get_value("PLANE_BANK_DEGREES")
         self.aq_vsi = self._get_value("VERTICAL_SPEED")
@@ -126,7 +137,7 @@ class FlightDataMetrics:
             )
         if (
             "Cessna CJ4 Citation Asobo" in self.aq_title
-            or "Boeing 747-8i Asobo" in self.aq_title
+            or "Salty Boeing 747-8i" in self.aq_title
         ):
             wt_lnav = self.vr.get("(L:WT_CJ4_NAV_ON, Bool)")
             self.aq_nav_mode = bool(self.aq_nav_mode + wt_lnav)
@@ -244,6 +255,15 @@ class FlightDataMetrics:
             pass
         return fpm
 
+    def min_agl_cruise(self):
+        fpm = self._config.min_agl_cruise
+        protected_alt = self._config.min_agl_cruise
+        if self.target_fpm() < 0 or self.aq_vsi < 0:
+            fpm = abs(min(self.target_fpm(), self.aq_vsi))
+        if self._config.min_agl_protection:
+            protected_alt = abs(fpm) * rate_steps(self._config.max_rate)
+        return max(self._config.min_agl_cruise, protected_alt)
+
     def distance_to_flc(self):
         if self.target_altitude_change() == 0:
             return self.get_vnav_distance()
@@ -325,14 +345,31 @@ class SimrateDiscriminator:
         """
         agressive = True
         try:
+            target = self.flight_params.target_fpm()
             vsi = self.flight_params.aq_vsi
-            if vsi > self._config.min_vsi and vsi < self._config.max_vsi:
+            if target > 0 and vsi > target:
+                agressive = True
+            elif target < 0 and vsi < target:
+                agressive = True
+            elif vsi > self._config.min_vsi and vsi < self._config.max_vsi:
                 agressive = False
             else:
                 self.messages.append(f"Agressive VS detected: {vsi} ft/s")
                 agressive = True
 
-        except TypeError:
+            if self.flight_params.aq_vsi < 0:
+                if (
+                    abs(
+                        (self.flight_params.aq_agl + self._config.min_agl_cruise)
+                        // self.flight_params.aq_vsi
+                    )
+                    < self._config.min_approach_time
+                ):
+                    self.messages.append(
+                        f"VSI may impact ground in less than {self._config.min_approach_time} minutes."
+                    )
+                    agressive = True
+        except TypeError as e:
             raise SimConnectDataError()
 
         return agressive
@@ -383,7 +420,27 @@ class SimrateDiscriminator:
         self.messages.append("No valid waypoints detected.")
         return False
 
-    def is_waypoint_close(self):
+    def is_custom_waypoint(self):
+        if self.flight_params.aq_agl > 10000:
+            return (False, False)
+        # This will trigger about 70 false positives around the world
+        custom_prev = (
+            self.flight_params.aq_prev_wp_ident == self.flight_params.first_waypoint
+            or self.flight_params.aq_prev_wp_ident.startswith("USR")
+            or self.flight_params.aq_prev_wp_ident.startswith("WP")
+            or len(self.flight_params.aq_prev_wp_ident.split(' ')[0]) > 5
+            or not self.flight_params.aq_prev_wp_ident.split(' ')[0].isupper()
+        )
+        custom_next = (
+            self.flight_params.aq_next_wp_ident.startswith("USR")
+            or self.flight_params.aq_next_wp_ident.startswith("WP")
+            or len(self.flight_params.aq_next_wp_ident.split(' ')[0]) > 5
+            or not self.flight_params.aq_next_wp_ident.split(' ')[0].isupper()
+        )
+
+        return (custom_prev, custom_next)
+
+    def is_waypoint_close(self, distance=None):
         """Check is a waypoint is close by.
 
         In the future, the definition of "close" could be parameterized on
@@ -393,30 +450,31 @@ class SimrateDiscriminator:
         IMPORTANT: Buffer size is decided largely by the FMS switching waypoints early
         to cut corners.
         """
-        close = True
+        # close = (True, True)
+        if distance is None:
+            distance = self._config.minimum_waypoint_distance
         try:
             ground_speed = self.flight_params.aq_ground_speed  # units: meters/sec
             mps_to_nmps = 5.4e-4  # one meter per second to 1 nautical mile per second
             nautical_miles_per_second = ground_speed * mps_to_nmps
             previous_dist = max(
-                self._config.minimum_waypoint_distance,
+                distance,
                 ceil(
                     nautical_miles_per_second
                     * self._config.waypoint_buffer
-                    * self._config.cautious_rate
+                    * rate_steps(self._config.cautious_rate)
                 ),
             )
             next_dist = max(
-                self._config.minimum_waypoint_distance,
+                distance,
                 nautical_miles_per_second
                 * self._config.waypoint_buffer
-                * self._config.max_rate,
+                * rate_steps(self._config.max_rate),
             )
             clearance = self.flight_params.get_waypoint_distances()
 
-            if clearance.prev > previous_dist and clearance.next > next_dist:
-                close = False
-            else:
+            close = (clearance.prev < previous_dist, clearance.next < next_dist)
+            if close:
                 self.messages.append(
                     f"Close ({previous_dist:.2f}, {next_dist:.2f}) to waypoint: ({clearance.prev:.2f} nm, {clearance.next:.2f} nm)"
                 )
@@ -473,7 +531,7 @@ class SimrateDiscriminator:
 
             if (
                 self.flight_params.time_to_flc()
-                < self._config.descent_safety_factor * self._config.max_rate
+                < self._config.descent_safety_factor * rate_steps(self._config.max_rate)
                 and self.flight_params.target_altitude_change() != 0
             ):
                 return True
@@ -539,9 +597,7 @@ class SimrateDiscriminator:
         return approaching
 
     def is_cruise_lights(self):
-        lights = (
-            not self.flight_params.aq_landing_lights
-        )
+        lights = not self.flight_params.aq_landing_lights
         if not lights:
             self.messages.append("Lights not configured for cruise")
         return lights
@@ -554,21 +610,28 @@ class SimrateDiscriminator:
 
         return cruise_configured
 
+    def is_in_hold(self):
+        holding = False
+        if "HOLD" in self.flight_params.aq_next_wp_ident:
+            holding = True
+            self.messages.append("In a hold")
+        return holding
+
     def get_max_sim_rate(self):
         """Returns what is considered the maximum stable sim rate.
 
         Looks at a lot of factors.
         """
-        stable = 1
         self.messages = []
+        stable = self._config.min_rate
         try:
             if self.is_waypoints_valid():
                 if not self.is_ap_active():
-                    stable = 1
+                    stable = self._config.min_rate
                 elif (
                     not self.is_cruise_configured() or not self.is_cruise_lights()
                 ) and self._config.check_cruise_configuration:
-                    stable = 1
+                    stable = self._config.min_rate
                 elif self.is_flc_needed():
                     if self._config.pause_at_tod and not self.have_paused_at_tod:
                         self.have_paused_at_tod = True
@@ -577,22 +640,44 @@ class SimrateDiscriminator:
                     else:
                         stable = self._config.min_rate
                     self.messages.append("Flight level change needed.")
-                elif self.is_too_low(self._config.min_agl_cruise):
+                elif self.is_too_low(self.flight_params.min_agl_cruise()):
                     self.messages.append("Too close to ground.")
+                    min_alt = (
+                        self.flight_params.get_ground_elevation()
+                        + self.flight_params.min_agl_cruise()
+                    )
+                    self.messages.append(f"Minimum altitude: {min_alt}")
                     stable = self._config.min_rate
+                elif self.is_in_hold():
+                    self.messages.append(f"Holding at")
+                    stable = self._config.min_rate
+                elif (
+                    self.is_custom_waypoint()[0]
+                    and self.is_waypoint_close(self._config.custom_waypoint_distance)[0]
+                ) or (
+                    self.is_custom_waypoint()[1]
+                    and self.is_waypoint_close(self._config.custom_waypoint_distance)[1]
+                ) or (
+                    self.flight_params.distance_to_destination() < self._config.custom_waypoint_distance
+                ):
+                    # The AP will switch waypoints several seconds away to cut corners,
+                    # so we slow down far enough away that we don't enter a turn prior
+                    # to slowing down. To keep from speeding up immediately when
+                    # a corner is cut we also give until 2.5nm after the switch
+                    self.messages.append("Close to custom waypoint.")
+                    stable = self._config.min_rate
+                elif (
+                    self.is_waypoint_close(self._config.minimum_waypoint_distance)[0]
+                    or self.is_waypoint_close(self._config.minimum_waypoint_distance)[1]
+                ):
+                    self.messages.append("Close to waypoint.")
+                    stable = self._config.cautious_rate
                 elif self.are_angles_aggressive():
                     self.messages.append("Pitch or bank too high")
                     stable = self._config.cautious_rate
                 elif self.is_vs_aggressive():
                     # pitch/bank may be a better/suffcient proxy
                     self.messages.append("Vertical speed too high.")
-                    stable = self._config.cautious_rate
-                elif self.is_waypoint_close():
-                    # The AP will switch waypoints several seconds away to cut corners,
-                    # so we slow down far enough away that we don't enter a turn prior
-                    # to slowing down (4nm). To keep from speeding up immediately when
-                    # a corner is cut we also give until 2.5nm after the switch
-                    self.messages.append("Close to waypoint.")
                     stable = self._config.cautious_rate
                 else:
                     self.messages.append("Flight stable")
@@ -607,4 +692,5 @@ class SimrateDiscriminator:
         return min(stable, int(self._config.max_rate))
 
     def get_messages(self):
-        return self.messages
+        messages = copy(self.messages)
+        return messages

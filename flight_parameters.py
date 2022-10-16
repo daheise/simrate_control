@@ -426,13 +426,15 @@ class SimrateDiscriminator:
         # This will trigger about 70 false positives around the world
         custom_prev = (
             self.flight_params.aq_prev_wp_ident == self.flight_params.first_waypoint
+            or self.flight_params.aq_prev_wp_ident.startswith("HOLD")
             or self.flight_params.aq_prev_wp_ident.startswith("USR")
             or self.flight_params.aq_prev_wp_ident.startswith("WP")
             or len(self.flight_params.aq_prev_wp_ident.split(' ')[0]) > 5
             or not self.flight_params.aq_prev_wp_ident.split(' ')[0].isupper()
         )
         custom_next = (
-            self.flight_params.aq_next_wp_ident.startswith("USR")
+            self.flight_params.aq_next_wp_ident.startswith("HOLD")
+            or self.flight_params.aq_next_wp_ident.startswith("USR")
             or self.flight_params.aq_next_wp_ident.startswith("WP")
             or len(self.flight_params.aq_next_wp_ident.split(' ')[0]) > 5
             or not self.flight_params.aq_next_wp_ident.split(' ')[0].isupper()

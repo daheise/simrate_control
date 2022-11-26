@@ -230,7 +230,7 @@ def connect(retries=999):
             quit()
         except Exception as e:
             # ui.write_message(type(e).__name__, e)
-            sleep(1)
+            sleep(1 + i**(1/2))
     return sm
 
 

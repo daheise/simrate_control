@@ -50,18 +50,18 @@ class SimRateManager:
         self.tts_engine = pyttsx3.init()
         self._request_sleep = 0.04
         self._max_request_sleep = 1.0
-        self._min_request_sleep = 0.04
+        self._min_request_sleep = 1 / 33
 
     def _get_value(self, aq_name, retries=sys.maxsize):
         # PySimConnect seems to crash the sim if requests happen too fast.
-        sleep(self._request_sleep)
+        sleep(self._min_request_sleep)
         val = self.aq.find(str(aq_name)).value
         i = 0
         while val is None and i < retries:
             i += 1
-            self._request_sleep = self._max_request_sleep #min(
-                #self._request_sleep + self._min_request_sleep * i, self._max_request_sleep
-            #)
+            self._request_sleep = self._max_request_sleep  # min(
+            # self._request_sleep + self._min_request_sleep * i, self._max_request_sleep
+            # )
             sleep(self._request_sleep)
             val = self.aq.find(str(aq_name)).value
         if i > 0:
@@ -230,7 +230,7 @@ def connect(retries=999):
             quit()
         except Exception as e:
             # ui.write_message(type(e).__name__, e)
-            sleep(1 + i**(1/2))
+            sleep(1 + i ** (1 / 2))
     return sm
 
 

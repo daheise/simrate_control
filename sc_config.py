@@ -56,7 +56,9 @@ class SimrateControlConfig:
                 self._config["stability"]["custom_waypoint_distance"]
             )  # nm
             self.min_agl_cruise = int(self._config["stability"]["min_agl_cruise"])  # ft
-            self.min_agl_protection = self._config["stability"].getboolean("min_agl_protection")
+            self.min_agl_protection = self._config["stability"].getboolean(
+                "min_agl_protection"
+            )
 
             # These values relate to approach detection
             self.min_agl_descent = int(
@@ -93,9 +95,7 @@ class SimrateControlConfig:
                 "stability", "check_cruise_configuration"
             )
 
-            self.ete_guard = self._config.getboolean(
-                "stability", "ete_guarded"
-            )
+            self.ete_guard = self._config.getboolean("stability", "ete_guarded")
 
             self.waypoint_vnav = self._config.getboolean("stability", "waypoint_vnav")
 

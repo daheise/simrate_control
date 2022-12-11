@@ -46,7 +46,7 @@ class WeightManager:
         return payloads
 
 
-mission_weight = 452
+mission_weight = 751
 cargo_weight = 0
 
 loader = WeightManager()

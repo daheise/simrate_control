@@ -41,7 +41,13 @@ class SimrateControlConfig:
             self.cautious_rate = float(self._config["simrate"]["cautious_rate"])
             self.set_barometer = self._config.getboolean("simrate", "set_barometer")
             self.set_mixture = self._config.getboolean("simrate", "set_mixture")
-
+            ####
+            # System parameters
+            ####
+            self.gpu_memory_utilization_limit = float(self._config["stability"]["gpu_memory_limit"])
+            ####
+            # Flight parameters
+            ####
             self.min_vsi = int(float(self._config["stability"]["min_vsi"]))
             self.max_vsi = int(float(self._config["stability"]["max_vsi"]))
             self.max_bank = float(self._config["stability"]["max_bank"])

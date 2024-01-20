@@ -1,0 +1,2 @@
+class SimConnectDataError(Exception):
+    pass

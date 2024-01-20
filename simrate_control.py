@@ -1,11 +1,10 @@
 from sc_config import SimrateControlConfig
 from sc_curses import ScCurses, CursesCommands
 from lib.koseng.simconnect_mobiflight import SimConnectMobiFlight
-from flight_parameters import (
-    FlightDataMetrics,
-    SimrateDiscriminator,
-    SimConnectDataError,
-)
+from simrate_exceptions import SimConnectDataError
+from flight_parameters import FlightDataMetrics
+from system_parameters import SystemDataMetrics
+from simrate_discriminator import SimrateDiscriminator
 from SimConnect import *
 import sys, os
 import configparser
@@ -30,6 +29,7 @@ class SimRateManager:
 
     def __init__(self, sm, config):
         self.sm = sm
+        self.messages = []
         self._config = config
         self.have_paused_at_tod = False
 
@@ -259,7 +259,8 @@ def main(stdscr):
         else:
             if flight_data_metrics is None:
                 flight_data_metrics = FlightDataMetrics(sm, config)
-                flight_stability = SimrateDiscriminator(flight_data_metrics, config)
+                system_metrics = SystemDataMetrics(config)
+                flight_stability = SimrateDiscriminator(flight_data_metrics, system_metrics, config)
                 # This will be used to toggle pause on and off
                 simrate_functions = [flight_stability.get_max_sim_rate, lambda: 1]
             if srm is None:
@@ -296,8 +297,10 @@ def main(stdscr):
                 if simrate_functions[0] != flight_stability.get_max_sim_rate:
                     ui.write_message("Acceleration paused by user")
                 flight_data_metrics.update()
+                system_metrics.update()
                 max_stable_rate = simrate_functions[0]()
                 messages += flight_stability.get_messages()
+                messages += system_metrics.get_messages()
                 messages += srm.update(max_stable_rate)
                 write_screen(
                     ui, config, flight_data_metrics, flight_stability, srm, messages
